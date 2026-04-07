@@ -32,9 +32,16 @@
             <div class="mb-6">
                 <div class="relative">
                     <textarea id="topic" rows="3"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none text-lg"
+                        class="w-full px-4 py-3 pr-32 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none text-lg"
                         placeholder="e.g., dog training tips for new owners"></textarea>
+                    <button type="button" onclick="enhanceTopic()" id="btn-enhance"
+                        class="absolute right-3 top-3 inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition disabled:opacity-50">
+                        &#10024; AI Enhance
+                    </button>
                 </div>
+                <p class="text-xs text-gray-400 mt-1.5" id="topic-hint">
+                    Type a brief idea and click <strong>AI Enhance</strong> — AI will expand it and generate a title &amp; audience.
+                </p>
             </div>
 
             <div class="grid grid-cols-2 gap-4 mb-6">
@@ -59,20 +66,13 @@
                     </select>
                 </div>
             </div>
-
-            <button onclick="enhanceAndGenerate()" id="btn-enhance"
-                class="w-full py-3 px-4 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
-                <span>&#10024;</span>
-                <span>AI Generate Presentation Brief & Outline</span>
-            </button>
-            <p class="text-xs text-gray-400 text-center mt-2">Uses <?= CREDIT_COSTS['generate_outline'] ?> credits &middot; You have <?= e($user['credits_balance']) ?> available</p>
         </div>
 
-        <!-- Enhanced Preview (hidden until AI responds) -->
-        <div id="enhanced-preview" class="hidden mt-6 bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <!-- Enhanced Brief (hidden until AI Enhance is clicked) -->
+        <div id="enhanced-preview" class="hidden mt-6 bg-white rounded-xl shadow-sm border border-green-200 p-8">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-900">AI-Generated Brief</h3>
-                <span class="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">&#10003; Editable</span>
+                <h3 class="text-lg font-bold text-gray-900">&#10003; AI-Generated Brief</h3>
+                <span class="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">All fields editable</span>
             </div>
 
             <div class="space-y-4">
@@ -91,6 +91,15 @@
                     <input type="text" id="gen-audience"
                         class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
                 </div>
+            </div>
+
+            <div class="mt-6">
+                <button onclick="generateOutline()" id="btn-generate"
+                    class="w-full py-3 px-4 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
+                    <span>&#9654;</span>
+                    <span>Generate Slides & Narration (<?= CREDIT_COSTS['generate_outline'] ?> credits)</span>
+                </button>
+                <p class="text-xs text-gray-400 text-center mt-2">You have <?= e($user['credits_balance']) ?> credits available</p>
             </div>
 
             <p id="enhance-status" class="text-sm text-gray-500 mt-4 text-center"></p>
@@ -209,46 +218,69 @@ function goToStep(step) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── Step 1: Enhance + Generate ──
+// ── Step 1a: AI Enhance (topic → title + description + audience) ──
 
-async function enhanceAndGenerate() {
-    const topic = document.getElementById('topic').value.trim();
-    if (topic.length < 2) {
-        document.getElementById('topic').focus();
-        return;
-    }
+async function enhanceTopic() {
+    const topicEl = document.getElementById('topic');
+    const topic = topicEl.value.trim();
+    if (topic.length < 2) { topicEl.focus(); return; }
 
     const btn = document.getElementById('btn-enhance');
     btn.disabled = true;
+    btn.innerHTML = '&#9889; Enhancing...';
 
-    // Show progress overlay
-    showProgress('Enhancing your topic with AI...');
+    showProgress('AI is expanding your topic...');
 
     const tone = document.getElementById('tone').value;
-    const duration = document.getElementById('duration').value;
-
-    // Step 1: Enhance topic
     const enhanced = await api('/api/enhance-topic', { topic, tone });
 
+    hideProgress();
+    btn.disabled = false;
+    btn.innerHTML = '&#10024; AI Enhance';
+
     if (!enhanced.success) {
-        hideProgress();
-        btn.disabled = false;
-        alert(enhanced.error || 'Failed to enhance topic');
+        alert(enhanced.error || 'Failed to enhance. Try again.');
         return;
     }
 
-    // Fill in the enhanced fields
+    // Fill in all the generated fields
+    topicEl.value = enhanced.data.description;
+    topicEl.classList.add('border-green-400');
+    setTimeout(() => topicEl.classList.remove('border-green-400'), 3000);
+
     document.getElementById('gen-title').value = enhanced.data.title;
     document.getElementById('gen-description').value = enhanced.data.description;
     document.getElementById('gen-audience').value = enhanced.data.audience;
-    document.getElementById('enhanced-preview').classList.remove('hidden');
 
-    // Step 2: Generate outline
-    showProgress('Generating slides and narration...');
+    // Show the enhanced brief section
+    document.getElementById('enhanced-preview').classList.remove('hidden');
+    document.getElementById('enhanced-preview').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    document.getElementById('topic-hint').innerHTML = '<span class="text-green-600 font-medium">&#10003; Enhanced!</span> Review below, edit if needed, then generate slides.';
+}
+
+// ── Step 1b: Generate Outline (separate button) ──
+
+async function generateOutline() {
+    const btn = document.getElementById('btn-generate');
+    btn.disabled = true;
+
+    const tone = document.getElementById('tone').value;
+    const duration = document.getElementById('duration').value;
+    const topic = document.getElementById('gen-description').value.trim();
+    const audience = document.getElementById('gen-audience').value.trim();
+
+    if (!topic) {
+        alert('Please click AI Enhance first to generate a description.');
+        btn.disabled = false;
+        return;
+    }
+
+    showProgress('Generating slides and narration scripts...');
 
     const outline = await api('/api/generate/outline-preview', {
-        topic: enhanced.data.description,
-        audience: enhanced.data.audience,
+        topic,
+        audience,
         duration: parseInt(duration),
         tone,
     });
@@ -257,14 +289,13 @@ async function enhanceAndGenerate() {
     btn.disabled = false;
 
     if (!outline.success) {
-        document.getElementById('enhance-status').textContent = 'Outline generation failed. Try again.';
-        document.getElementById('enhance-status').classList.add('text-red-500');
+        alert(outline.error || 'Failed to generate outline. Try again.');
         return;
     }
 
-    // Store outline data
+    // Store outline data with the enhanced title
     outlineData = outline.data;
-    outlineData.title = enhanced.data.title; // Use enhanced title
+    outlineData.title = document.getElementById('gen-title').value || outlineData.title;
 
     // Render slides preview
     renderSlidesPreview(outlineData);
