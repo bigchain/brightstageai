@@ -65,6 +65,26 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiGenerateController())->upload_slide_image((int)$m[1]);
     }
 
+    // Topic enhancement API
+    if ($uri === '/api/enhance-topic' && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $topic = trim($input['topic'] ?? '');
+        $audience = trim($input['audience'] ?? 'General audience');
+        $tone = trim($input['tone'] ?? 'professional');
+
+        if ($topic === '') json_error('Topic is required');
+
+        require_once APP_ROOT . '/src/services/TopicEnhancerService.php';
+        $service = new TopicEnhancerService();
+        $enhanced = $service->enhance($topic, $audience, $tone);
+
+        if ($enhanced === null) json_error('Failed to enhance topic. Try again.');
+        json_success(['enhanced_topic' => $enhanced]);
+    }
+
     // Auth API
     if ($uri === '/api/auth/me' && $method === 'GET') {
         if (!is_logged_in()) {

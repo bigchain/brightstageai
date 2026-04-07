@@ -2,7 +2,7 @@
 
     <div class="mb-8">
         <h1 class="text-2xl font-bold text-gray-900">New Presentation</h1>
-        <p class="text-gray-500 mt-1">Tell us about your topic. AI will generate a complete outline.</p>
+        <p class="text-gray-500 mt-1">Tell us your topic — AI will enhance it and generate a complete outline with slide content and narration.</p>
     </div>
 
     <!-- Credit Cost Notice -->
@@ -21,10 +21,18 @@
             <label for="topic" class="block text-sm font-medium text-gray-700 mb-1">
                 What is your presentation about? <span class="text-red-500">*</span>
             </label>
-            <textarea id="topic" name="topic" rows="3" required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none"
-                placeholder="e.g., The Future of AI in Healthcare — covering current applications, emerging trends, and ethical considerations"></textarea>
-            <p class="text-xs text-gray-400 mt-1">Be specific. The more detail, the better the outline.</p>
+            <div class="relative">
+                <textarea id="topic" name="topic" rows="4" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none pr-28"
+                    placeholder="e.g., dog training tips, AI in healthcare, marketing strategies for startups..."></textarea>
+                <button type="button" id="enhance-btn" onclick="enhanceTopic()"
+                    class="absolute right-2 top-2 inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 transition">
+                    &#10024; AI Enhance
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1" id="topic-hint">
+                Type a brief idea and click <strong>AI Enhance</strong> to expand it, or write a detailed description yourself.
+            </p>
         </div>
 
         <!-- Title (optional) -->
@@ -108,17 +116,66 @@
         <div class="pt-4">
             <button type="submit" id="submit-btn"
                 class="w-full py-3 px-4 border border-transparent rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                Generate Outline (<?= CREDIT_COSTS['generate_outline'] ?> credits)
+                Generate Outline with Slides & Narration (<?= CREDIT_COSTS['generate_outline'] ?> credits)
             </button>
+            <p class="text-xs text-gray-400 text-center mt-2">
+                AI will create slide content, bullet points, and speaker narration scripts — all editable before video generation.
+            </p>
         </div>
     </form>
 </div>
 
 <script>
-// Prevent double-submit
+async function enhanceTopic() {
+    const topicEl = document.getElementById('topic');
+    const btn = document.getElementById('enhance-btn');
+    const hint = document.getElementById('topic-hint');
+    const topic = topicEl.value.trim();
+
+    if (topic.length < 2) {
+        topicEl.focus();
+        topicEl.classList.add('border-red-300');
+        setTimeout(() => topicEl.classList.remove('border-red-300'), 2000);
+        return;
+    }
+
+    // Show loading state
+    btn.disabled = true;
+    btn.innerHTML = '&#9889; Enhancing...';
+    btn.classList.add('opacity-50');
+    topicEl.classList.add('bg-gray-50');
+
+    try {
+        const result = await api('/api/enhance-topic', {
+            topic: topic,
+            audience: document.getElementById('audience').value,
+            tone: document.getElementById('tone').value,
+        });
+
+        if (result.success && result.data.enhanced_topic) {
+            topicEl.value = result.data.enhanced_topic;
+            topicEl.classList.add('border-green-300', 'bg-green-50');
+            hint.innerHTML = '<span class="text-green-600 font-medium">&#10003; Enhanced!</span> Review and edit if needed, then generate your outline.';
+            setTimeout(() => {
+                topicEl.classList.remove('border-green-300', 'bg-green-50');
+            }, 3000);
+        } else {
+            hint.innerHTML = '<span class="text-red-500">Enhancement failed. You can still use your topic as-is.</span>';
+        }
+    } catch (err) {
+        hint.innerHTML = '<span class="text-red-500">Network error. Try again.</span>';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '&#10024; AI Enhance';
+    btn.classList.remove('opacity-50');
+    topicEl.classList.remove('bg-gray-50');
+}
+
+// Prevent double-submit on form
 document.querySelector('form').addEventListener('submit', function() {
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
-    btn.textContent = 'Generating outline... This may take 15-30 seconds';
+    btn.textContent = 'Generating outline with slides & narration... This may take 20-40 seconds';
 });
 </script>
