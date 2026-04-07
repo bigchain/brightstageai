@@ -181,30 +181,40 @@
             </div>
 
             <!-- Live Slide Preview -->
-            <!-- Live Slide Previews — Title + Bullets -->
-            <div class="mt-6 space-y-4">
-                <label class="block text-xs font-medium text-gray-500">PREVIEW — How your slides will look</label>
+            <!-- Live Slide Previews -->
+            <div class="mt-8 space-y-5">
+                <label class="block text-xs font-medium text-gray-400 uppercase tracking-wider">Preview — Your slides in this design</label>
 
                 <!-- Title Slide Preview -->
-                <div class="rounded-xl overflow-hidden shadow-lg border border-gray-200" style="aspect-ratio: 16/9;">
-                    <div id="preview-title-slide" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8%;background:linear-gradient(135deg,#1e3a5f,#3498db);font-family:'Inter',sans-serif;position:relative;overflow:hidden;transition:all 0.4s ease;">
-                        <div id="p-circle-1" style="position:absolute;top:-15%;right:-8%;width:45%;height:70%;border-radius:50%;background:rgba(255,255,255,0.06);transition:background 0.4s;"></div>
-                        <div id="p-circle-2" style="position:absolute;bottom:-20%;left:-5%;width:35%;height:55%;border-radius:50%;background:rgba(255,255,255,0.03);transition:background 0.4s;"></div>
-                        <div id="p-accent-bar" style="position:absolute;bottom:10%;left:50%;transform:translateX(-50%);width:80px;height:4px;border-radius:2px;background:#3498db;transition:background 0.4s;"></div>
-                        <div style="text-align:center;position:relative;z-index:1;max-width:80%;">
-                            <div id="p-title" style="font-size:2.4em;font-weight:800;color:#fff;line-height:1.15;margin-bottom:0.5em;transition:color 0.4s;"></div>
-                            <div id="p-subtitle" style="font-size:1em;color:rgba(255,255,255,0.65);font-weight:400;transition:color 0.4s;"></div>
+                <div class="rounded-2xl overflow-hidden shadow-2xl border border-gray-200/60" style="aspect-ratio: 16/9;">
+                    <div id="preview-title-slide" class="preview-slide" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8% 10%;font-family:'Inter',sans-serif;position:relative;overflow:hidden;transition:all 0.5s cubic-bezier(0.4,0,0.2,1);">
+                        <!-- Decorative shapes -->
+                        <div id="p-shape-1" style="position:absolute;top:-10%;right:-5%;width:40%;height:65%;border-radius:50%;transition:all 0.5s;"></div>
+                        <div id="p-shape-2" style="position:absolute;bottom:-15%;left:-3%;width:30%;height:50%;border-radius:50%;transition:all 0.5s;"></div>
+                        <div id="p-shape-3" style="position:absolute;top:15%;left:6%;width:3px;height:25%;border-radius:2px;transition:all 0.5s;"></div>
+                        <div id="p-shape-4" style="position:absolute;bottom:8%;right:8%;width:40px;height:40px;border-radius:50%;border:2px solid;opacity:0.15;transition:all 0.5s;"></div>
+                        <!-- Content -->
+                        <div style="text-align:center;position:relative;z-index:1;max-width:75%;">
+                            <div id="p-badge" style="display:inline-block;padding:4px 16px;border-radius:20px;font-size:0.65em;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:1.2em;transition:all 0.5s;"></div>
+                            <div id="p-title" style="font-size:2.6em;font-weight:800;line-height:1.1;margin-bottom:0.5em;letter-spacing:-0.02em;transition:all 0.5s;"></div>
+                            <div id="p-divider" style="width:60px;height:3px;border-radius:2px;margin:0 auto 0.8em;transition:all 0.5s;"></div>
+                            <div id="p-subtitle" style="font-size:0.95em;font-weight:400;line-height:1.5;opacity:0.7;transition:all 0.5s;"></div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Bullets Slide Preview -->
-                <div class="rounded-xl overflow-hidden shadow-lg border border-gray-200" style="aspect-ratio: 16/9;">
-                    <div id="preview-bullets-slide" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;padding:6% 8%;background:linear-gradient(160deg,#1e3a5f,#1a2d47);font-family:'Inter',sans-serif;position:relative;overflow:hidden;transition:all 0.4s ease;">
-                        <div id="p2-accent-stripe" style="position:absolute;top:0;left:0;width:6px;height:100%;background:#3498db;transition:background 0.4s;"></div>
-                        <div style="position:relative;z-index:1;">
-                            <div id="p2-title" style="font-size:1.6em;font-weight:700;color:#fff;margin-bottom:0.8em;transition:color 0.4s;"></div>
-                            <div id="p2-bullets" style="font-size:0.85em;color:rgba(255,255,255,0.8);line-height:2.2;transition:color 0.4s;"></div>
+                <div class="rounded-2xl overflow-hidden shadow-2xl border border-gray-200/60" style="aspect-ratio: 16/9;">
+                    <div id="preview-bullets-slide" class="preview-slide" style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;padding:5% 7%;font-family:'Inter',sans-serif;position:relative;overflow:hidden;transition:all 0.5s cubic-bezier(0.4,0,0.2,1);">
+                        <!-- Decorative elements -->
+                        <div id="p2-stripe" style="position:absolute;top:0;left:0;width:5px;height:100%;transition:all 0.5s;"></div>
+                        <div id="p2-corner" style="position:absolute;top:5%;right:5%;width:80px;height:80px;border-radius:16px;opacity:0.06;transform:rotate(15deg);transition:all 0.5s;"></div>
+                        <div id="p2-dots" style="position:absolute;bottom:6%;right:6%;display:flex;gap:6px;transition:all 0.5s;"></div>
+                        <!-- Content -->
+                        <div style="position:relative;z-index:1;padding-left:3%;">
+                            <div id="p2-label" style="font-size:0.6em;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.6em;transition:all 0.5s;"></div>
+                            <div id="p2-title" style="font-size:1.7em;font-weight:700;margin-bottom:1em;letter-spacing:-0.01em;transition:all 0.5s;"></div>
+                            <div id="p2-bullets" style="font-size:0.8em;line-height:1.8;transition:all 0.5s;"></div>
                         </div>
                     </div>
                 </div>
@@ -517,32 +527,59 @@ async function polishSlide(index) {
 
 function previewTemplate(primary, accent, secondary, font, name) {
     const isLight = ['#ffffff', '#fafafa', '#f5f5f5'].includes(primary);
+    const fontStack = `'${font}', 'Inter', -apple-system, sans-serif`;
 
-    // ── Title Slide Preview ──
-    const titleSlide = document.getElementById('preview-title-slide');
-    titleSlide.style.background = isLight
-        ? primary
-        : `linear-gradient(135deg, ${primary}, ${mixColor(primary, accent, 0.3)})`;
-    titleSlide.style.fontFamily = `'${font}', sans-serif`;
-    if (isLight) titleSlide.style.borderBottom = `3px solid ${accent}`;
-    else titleSlide.style.borderBottom = 'none';
+    // ── Title Slide ──
+    const ts = document.getElementById('preview-title-slide');
+    ts.style.fontFamily = fontStack;
 
-    document.getElementById('p-circle-1').style.background = isLight ? `${accent}08` : `${secondary}06`;
-    document.getElementById('p-circle-2').style.background = isLight ? `${accent}05` : `${secondary}03`;
-    document.getElementById('p-accent-bar').style.background = accent;
+    if (isLight) {
+        ts.style.background = `linear-gradient(160deg, ${primary} 0%, #f8f9fa 100%)`;
+    } else {
+        ts.style.background = `linear-gradient(135deg, ${primary} 0%, ${mixColor(primary, accent, 0.25)} 60%, ${mixColor(accent, primary, 0.4)} 100%)`;
+    }
+
+    // Shapes
+    document.getElementById('p-shape-1').style.background = isLight ? `${accent}0a` : `${secondary}08`;
+    document.getElementById('p-shape-2').style.background = isLight ? `${accent}06` : `${secondary}05`;
+    document.getElementById('p-shape-3').style.background = accent;
+    document.getElementById('p-shape-4').style.borderColor = isLight ? accent : secondary;
+
+    // Badge
+    const badge = document.getElementById('p-badge');
+    badge.style.background = isLight ? `${accent}15` : `${secondary}15`;
+    badge.style.color = isLight ? accent : secondary;
+    badge.textContent = 'Presentation';
+
+    // Text
     document.getElementById('p-title').style.color = secondary;
-    document.getElementById('p-subtitle').style.color = isLight ? `${secondary}99` : `${secondary}aa`;
+    document.getElementById('p-divider').style.background = accent;
+    document.getElementById('p-subtitle').style.color = secondary;
 
-    // ── Bullets Slide Preview ──
-    const bulletsSlide = document.getElementById('preview-bullets-slide');
-    bulletsSlide.style.background = isLight
-        ? primary
-        : `linear-gradient(160deg, ${primary}, ${mixColor(primary, '#000000', 0.2)})`;
-    bulletsSlide.style.fontFamily = `'${font}', sans-serif`;
+    // ── Bullets Slide ──
+    const bs = document.getElementById('preview-bullets-slide');
+    bs.style.fontFamily = fontStack;
 
-    document.getElementById('p2-accent-stripe').style.background = accent;
+    if (isLight) {
+        bs.style.background = primary;
+    } else {
+        bs.style.background = `linear-gradient(170deg, ${primary} 0%, ${mixColor(primary, '#000', 0.15)} 100%)`;
+    }
+
+    document.getElementById('p2-stripe').style.background = `linear-gradient(180deg, ${accent}, ${mixColor(accent, primary, 0.5)})`;
+    document.getElementById('p2-corner').style.background = isLight ? accent : secondary;
+
+    const label = document.getElementById('p2-label');
+    label.style.color = accent;
+
     document.getElementById('p2-title').style.color = secondary;
-    document.getElementById('p2-bullets').style.color = isLight ? `${secondary}cc` : `${secondary}cc`;
+    document.getElementById('p2-bullets').style.color = isLight ? `${secondary}bb` : `${secondary}cc`;
+
+    // Dots decoration
+    const dotsEl = document.getElementById('p2-dots');
+    dotsEl.innerHTML = [1,2,3].map(() =>
+        `<div style="width:6px;height:6px;border-radius:50%;background:${accent};opacity:0.3;"></div>`
+    ).join('');
 
     // ── Fill with real content ──
     if (outlineData && outlineData.slides.length > 0) {
@@ -553,30 +590,31 @@ function previewTemplate(primary, accent, secondary, font, name) {
         const firstLine = firstContent.split('\n')[0]?.replace(/^-\s*/, '') || '';
         document.getElementById('p-subtitle').textContent = firstLine || 'Your presentation subtitle';
 
-        // Bullets slide — use slide 2 if available
-        const bulletSlide = outlineData.slides[1] || outlineData.slides[0];
-        document.getElementById('p2-title').textContent = bulletSlide.title;
+        // Bullets slide
+        const bSlide = outlineData.slides[1] || outlineData.slides[0];
+        label.textContent = `Slide ${bSlide === outlineData.slides[1] ? '02' : '01'}`;
+        document.getElementById('p2-title').textContent = bSlide.title;
 
-        const bullets = (bulletSlide.content || '').split('\n')
+        const bullets = (bSlide.content || '').split('\n')
             .filter(l => l.trim())
             .slice(0, 4)
-            .map(l => {
+            .map((l, i) => {
                 const text = l.replace(/^-\s*/, '');
-                return `<div style="display:flex;align-items:flex-start;margin-bottom:0.4em;">
-                    <span style="color:${accent};margin-right:0.6em;font-size:1.2em;line-height:1;">&#9679;</span>
-                    <span>${escHtml(text)}</span>
+                return `<div style="display:flex;align-items:flex-start;margin-bottom:0.6em;padding:0.4em 0.6em;border-radius:8px;${i === 0 ? `background:${accent}0d;` : ''}">
+                    <span style="width:22px;height:22px;border-radius:6px;background:${accent}${i === 0 ? '' : '22'};color:${i === 0 ? (isLight ? '#fff' : '#fff') : accent};display:flex;align-items:center;justify-content:center;font-size:0.7em;font-weight:700;margin-right:0.8em;flex-shrink:0;">${i + 1}</span>
+                    <span style="padding-top:2px;">${escHtml(text)}</span>
                 </div>`;
             }).join('');
         document.getElementById('p2-bullets').innerHTML = bullets;
     }
 }
 
-// Simple color mixer for gradient variation
 function mixColor(hex1, hex2, ratio) {
-    const r1 = parseInt(hex1.slice(1,3), 16), g1 = parseInt(hex1.slice(3,5), 16), b1 = parseInt(hex1.slice(5,7), 16);
-    const r2 = parseInt(hex2.slice(1,3), 16), g2 = parseInt(hex2.slice(3,5), 16), b2 = parseInt(hex2.slice(5,7), 16);
-    const r = Math.round(r1 + (r2 - r1) * ratio), g = Math.round(g1 + (g2 - g1) * ratio), b = Math.round(b1 + (b2 - b1) * ratio);
-    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    const parse = (h, s) => parseInt(h.slice(s, s+2), 16);
+    const r = Math.round(parse(hex1,1) + (parse(hex2,1) - parse(hex1,1)) * ratio);
+    const g = Math.round(parse(hex1,3) + (parse(hex2,3) - parse(hex1,3)) * ratio);
+    const b = Math.round(parse(hex1,5) + (parse(hex2,5) - parse(hex1,5)) * ratio);
+    return `#${[r,g,b].map(v => Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0')).join('')}`;
 }
 
 // Preview is triggered inline — goToStep handles it directly
