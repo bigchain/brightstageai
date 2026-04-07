@@ -52,16 +52,23 @@ class UserModel
 
     public function deduct_credits(int $user_id, int $amount, string $action, ?int $presentation_id = null): bool
     {
+        if ($amount <= 0) {
+            return false;
+        }
+
         $this->db->beginTransaction();
         try {
-            // Check balance
-            $balance = $this->get_credits($user_id);
+            // Lock the user row to prevent race conditions (SELECT FOR UPDATE)
+            $stmt = $this->db->prepare('SELECT credits_balance FROM users WHERE id = ? FOR UPDATE');
+            $stmt->execute([$user_id]);
+            $balance = (int)($stmt->fetchColumn() ?: 0);
+
             if ($balance < $amount) {
                 $this->db->rollBack();
                 return false;
             }
 
-            // Deduct
+            // Atomic deduct with balance check
             $stmt = $this->db->prepare(
                 'UPDATE users SET credits_balance = credits_balance - ?, updated_at = NOW() WHERE id = ? AND credits_balance >= ?'
             );
@@ -83,6 +90,7 @@ class UserModel
             return true;
         } catch (Exception $e) {
             $this->db->rollBack();
+            error_log('BrightStage credit deduction failed: ' . $e->getMessage());
             return false;
         }
     }

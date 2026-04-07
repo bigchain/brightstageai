@@ -10,6 +10,15 @@ require_once __DIR__ . '/../src/config/database.php';
 require_once __DIR__ . '/../src/helpers/functions.php';
 require_once __DIR__ . '/../src/middleware/auth.php';
 
+// Security headers — prevent clickjacking, XSS, MIME sniffing
+header('X-Frame-Options: DENY');
+header('X-Content-Type-Options: nosniff');
+header('X-XSS-Protection: 1; mode=block');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+if (APP_ENV === 'production') {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
+
 // Start session
 init_session();
 

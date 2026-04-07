@@ -39,12 +39,7 @@ define('CREDIT_COSTS', [
     'generate_images'       => 10,
 ]);
 
-// OpenRouter
-define('OPENROUTER_API_KEY', env('OPENROUTER_API_KEY'));
+// OpenRouter — keys accessed via env() at point of use, NOT stored as global constants
+// This prevents accidental exposure in error dumps, var_dump, get_defined_constants(), etc.
 define('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1');
-define('OPENROUTER_MODEL', env('OPENROUTER_MODEL', 'anthropic/claude-sonnet-4'));
-
-// Stripe
-define('STRIPE_SECRET_KEY', env('STRIPE_SECRET_KEY'));
-define('STRIPE_PUBLISHABLE_KEY', env('STRIPE_PUBLISHABLE_KEY'));
-define('STRIPE_WEBHOOK_SECRET', env('STRIPE_WEBHOOK_SECRET'));
+define('OPENROUTER_DEFAULT_MODEL', 'anthropic/claude-sonnet-4');

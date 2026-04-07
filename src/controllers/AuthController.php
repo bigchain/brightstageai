@@ -65,7 +65,8 @@ class AuthController
         // Log signup bonus
         $this->users->add_credits($user_id, 0, 'signup_bonus'); // Credits already set in create()
 
-        // Auto login
+        // Auto login — regenerate session to prevent fixation
+        session_regenerate_id(true);
         $user = $this->users->find_by_id($user_id);
         $_SESSION['user'] = [
             'id'              => $user['id'],
@@ -106,6 +107,9 @@ class AuthController
             redirect('/login');
         }
 
+        // Regenerate session ID to prevent session fixation
+        session_regenerate_id(true);
+
         // Set session
         $_SESSION['user'] = [
             'id'              => $user['id'],
@@ -121,6 +125,8 @@ class AuthController
 
     public function logout(): void
     {
+        $_SESSION = [];
+        session_regenerate_id(true);
         session_destroy();
         redirect('/');
     }

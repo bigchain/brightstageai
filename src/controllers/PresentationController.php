@@ -47,29 +47,52 @@ class PresentationController
         }
 
         $user = current_user();
-        $topic    = trim($_POST['topic'] ?? '');
-        $audience = trim($_POST['audience'] ?? '');
-        $duration = (int)($_POST['duration'] ?? 10);
-        $tone     = trim($_POST['tone'] ?? 'professional');
-        $title    = trim($_POST['title'] ?? '');
 
-        // Validate
-        if ($topic === '') {
-            flash('error', 'Topic is required.');
+        // Server-side duplicate submit protection
+        $submit_key = 'last_outline_' . $user['id'];
+        if (isset($_SESSION[$submit_key]) && (time() - $_SESSION[$submit_key]) < 10) {
+            flash('error', 'Please wait before submitting again.');
+            redirect('/create');
+        }
+
+        $topic    = mb_substr(trim($_POST['topic'] ?? ''), 0, 2000);
+        $audience = mb_substr(trim($_POST['audience'] ?? ''), 0, 200);
+        $title    = mb_substr(trim($_POST['title'] ?? ''), 0, 255);
+
+        // Validate duration against allowed values
+        $allowed_durations = [5, 10, 15, 30];
+        $duration = (int)($_POST['duration'] ?? 10);
+        if (!in_array($duration, $allowed_durations, true)) {
+            $duration = 10;
+        }
+
+        // Validate tone against allowed values
+        $allowed_tones = ['professional', 'casual', 'academic', 'inspirational', 'technical', 'sales'];
+        $tone = trim($_POST['tone'] ?? 'professional');
+        if (!in_array($tone, $allowed_tones, true)) {
+            $tone = 'professional';
+        }
+
+        // Validate topic
+        if ($topic === '' || mb_strlen($topic) < 3) {
+            flash('error', 'Topic is required (at least 3 characters).');
             redirect('/create');
         }
 
         if ($title === '') {
-            $title = substr($topic, 0, 100);
+            $title = mb_substr($topic, 0, 100);
         }
 
-        // Check credits
+        // Check credits (uses SELECT FOR UPDATE in deduct to prevent race condition)
         $cost = CREDIT_COSTS['generate_outline'];
         $balance = $this->users->get_credits($user['id']);
         if ($balance < $cost) {
             flash('error', "Not enough credits. You need {$cost} credits but have {$balance}.");
             redirect('/create');
         }
+
+        // Mark submission time to prevent double-submit
+        $_SESSION[$submit_key] = time();
 
         // Create presentation
         $pres_id = $this->presentations->create(

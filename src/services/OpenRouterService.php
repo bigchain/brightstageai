@@ -12,9 +12,13 @@ class OpenRouterService
 
     public function __construct()
     {
-        $this->api_key  = OPENROUTER_API_KEY;
+        $this->api_key  = env('OPENROUTER_API_KEY', '');
         $this->base_url = OPENROUTER_BASE_URL;
-        $this->model    = OPENROUTER_MODEL;
+        $this->model    = env('OPENROUTER_MODEL', OPENROUTER_DEFAULT_MODEL);
+
+        if ($this->api_key === '') {
+            error_log('BrightStage: OPENROUTER_API_KEY not set in .env');
+        }
     }
 
     /**
@@ -62,7 +66,8 @@ class OpenRouterService
         $parsed = json_decode($raw, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('OpenRouter JSON parse error: ' . json_last_error_msg() . ' | Raw: ' . substr($raw, 0, 500));
+            // Log error type only — never log raw AI response (may contain user data)
+            error_log('BrightStage OpenRouter: JSON parse error - ' . json_last_error_msg());
             return null;
         }
 
@@ -97,12 +102,13 @@ class OpenRouterService
         curl_close($ch);
 
         if ($error) {
-            error_log("OpenRouter cURL error: {$error}");
+            error_log("BrightStage OpenRouter: cURL error - {$error}");
             return null;
         }
 
         if ($http_code >= 400) {
-            error_log("OpenRouter API error (HTTP {$http_code}): " . substr($body, 0, 500));
+            // Log HTTP code only — response body may contain sensitive info
+            error_log("BrightStage OpenRouter: API error HTTP {$http_code}");
             return null;
         }
 
