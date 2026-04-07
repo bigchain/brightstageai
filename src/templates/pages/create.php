@@ -149,20 +149,20 @@
     <div id="step-3" class="hidden">
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
             <h2 class="text-xl font-bold text-gray-900 mb-1">Choose Your Design</h2>
-            <p class="text-gray-500 text-sm mb-6">Pick a visual style for your slides. You can change this later.</p>
+            <p class="text-gray-500 text-sm mb-6">Click a template to see a live preview of your first slide.</p>
 
-            <div class="grid grid-cols-5 gap-4 mb-8">
+            <div class="grid grid-cols-5 gap-4 mb-6">
                 <?php
                 $templates = [
-                    ['1', 'Corporate', '#1e3a5f', '#3498db', '#ffffff'],
-                    ['2', 'Creative', '#ff6b6b', '#6c5ce7', '#ffeaa7'],
-                    ['3', 'Minimal', '#2d3436', '#00b894', '#ffffff'],
-                    ['4', 'Dark', '#0a0a0a', '#e94560', '#e0e0e0'],
-                    ['5', 'Vibrant', '#667eea', '#f093fb', '#ffffff'],
+                    ['1', 'Corporate', '#1e3a5f', '#3498db', '#ffffff', 'Inter'],
+                    ['2', 'Creative', '#ff6b6b', '#6c5ce7', '#ffeaa7', 'Poppins'],
+                    ['3', 'Minimal', '#2d3436', '#00b894', '#ffffff', 'Playfair Display'],
+                    ['4', 'Dark', '#0a0a0a', '#e94560', '#e0e0e0', 'Raleway'],
+                    ['5', 'Vibrant', '#667eea', '#f093fb', '#ffffff', 'Montserrat'],
                 ];
-                foreach ($templates as [$tid, $tname, $tprimary, $taccent, $tsecondary]):
+                foreach ($templates as [$tid, $tname, $tprimary, $taccent, $tsecondary, $tfont]):
                 ?>
-                <label class="cursor-pointer">
+                <label class="cursor-pointer" onclick="previewTemplate('<?= $tprimary ?>', '<?= $taccent ?>', '<?= $tsecondary ?>', '<?= $tfont ?>', '<?= $tname ?>')">
                     <input type="radio" name="template_id" value="<?= $tid ?>" class="sr-only peer" <?= $tid === '1' ? 'checked' : '' ?>>
                     <div class="rounded-xl border-2 border-gray-200 peer-checked:border-brand-500 peer-checked:ring-2 peer-checked:ring-brand-200 p-4 transition hover:border-gray-300 hover:shadow-sm">
                         <div class="h-20 rounded-lg mb-3" style="background: linear-gradient(135deg, <?= $tprimary ?>, <?= $taccent ?>);">
@@ -175,6 +175,22 @@
                     </div>
                 </label>
                 <?php endforeach; ?>
+            </div>
+
+            <!-- Live Slide Preview -->
+            <div class="mt-6">
+                <label class="block text-xs font-medium text-gray-500 mb-2">PREVIEW — Your title slide with selected design</label>
+                <div class="rounded-xl overflow-hidden shadow-lg border border-gray-200" style="aspect-ratio: 16/9;">
+                    <div id="template-preview" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 8%; background: linear-gradient(135deg, #1e3a5f, #3498db); font-family: 'Inter', sans-serif; position: relative; overflow: hidden;">
+                        <!-- Decorative accent circle -->
+                        <div id="preview-accent-circle" style="position: absolute; top: -20%; right: -10%; width: 50%; height: 80%; border-radius: 50%; background: rgba(255,255,255,0.05);"></div>
+                        <div id="preview-accent-line" style="position: absolute; bottom: 12%; left: 8%; width: 60px; height: 4px; border-radius: 2px; background: #3498db;"></div>
+                        <div style="text-align: center; position: relative; z-index: 1;">
+                            <div id="preview-title-text" style="font-size: 2.2em; font-weight: 800; color: #ffffff; line-height: 1.2; margin-bottom: 0.4em;"></div>
+                            <div id="preview-subtitle-text" style="font-size: 0.95em; color: rgba(255,255,255,0.7); font-weight: 400;"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -463,6 +479,52 @@ async function polishSlide(index) {
         alert(result.error || 'Polish failed. Try again.');
     }
 }
+
+// ── Step 3: Template Preview ──
+
+function previewTemplate(primary, accent, secondary, font, name) {
+    const preview = document.getElementById('template-preview');
+    const titleText = document.getElementById('preview-title-text');
+    const subtitleText = document.getElementById('preview-subtitle-text');
+    const accentLine = document.getElementById('preview-accent-line');
+    const accentCircle = document.getElementById('preview-accent-circle');
+
+    // Update gradient background
+    preview.style.background = `linear-gradient(135deg, ${primary}, ${accent})`;
+    preview.style.fontFamily = `'${font}', sans-serif`;
+
+    // Update text colors
+    titleText.style.color = secondary;
+    subtitleText.style.color = secondary;
+    subtitleText.style.opacity = '0.7';
+
+    // Update accent decorations
+    accentLine.style.background = accent;
+    accentCircle.style.background = `${secondary}10`;
+
+    // Fill with actual slide content
+    if (outlineData && outlineData.slides.length > 0) {
+        titleText.textContent = outlineData.title || outlineData.slides[0].title;
+        // Use first bullet from slide 2 as subtitle, or slide 1 content
+        const firstContent = outlineData.slides[0].content || '';
+        const firstLine = firstContent.split('\n')[0]?.replace(/^-\s*/, '') || '';
+        subtitleText.textContent = firstLine || 'Your presentation subtitle';
+    }
+
+    // Smooth transition
+    preview.style.transition = 'background 0.4s ease';
+}
+
+// Auto-preview when entering Step 3
+const origGoToStep = goToStep;
+goToStep = function(step) {
+    origGoToStep(step);
+    if (step === 3) {
+        // Trigger preview for currently selected template
+        const checked = document.querySelector('input[name="template_id"]:checked');
+        if (checked) checked.closest('label').click();
+    }
+};
 
 // ── Step 3: Save Presentation ──
 
