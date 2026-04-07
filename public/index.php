@@ -169,7 +169,9 @@ if (str_starts_with($uri, '/api/')) {
         echo '</head><body>';
         foreach ($image_urls as $path) {
             $data = base64_encode(file_get_contents($path));
-            $mime = mime_content_type($path);
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $path);
+            finfo_close($finfo);
             echo "<img src=\"data:{$mime};base64,{$data}\">";
         }
         echo '</body></html>';

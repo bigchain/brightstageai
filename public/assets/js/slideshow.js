@@ -7,6 +7,7 @@ const Slideshow = {
     overlay: null,
     slides: [],
     current: 0,
+    _boundKeyHandler: null,
 
     /**
      * Open slideshow with array of slide image URLs.
@@ -22,7 +23,8 @@ const Slideshow = {
         this.current = startIndex;
         this.createOverlay();
         this.render();
-        document.addEventListener('keydown', this.handleKey);
+        this._boundKeyHandler = (e) => this.handleKey(e);
+        document.addEventListener('keydown', this._boundKeyHandler);
     },
 
     close() {
@@ -30,7 +32,10 @@ const Slideshow = {
             this.overlay.remove();
             this.overlay = null;
         }
-        document.removeEventListener('keydown', this.handleKey);
+        if (this._boundKeyHandler) {
+            document.removeEventListener('keydown', this._boundKeyHandler);
+            this._boundKeyHandler = null;
+        }
     },
 
     next() {

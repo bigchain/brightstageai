@@ -220,7 +220,7 @@ const SLIDES_DATA = <?= json_encode(array_map(function($s) {
         'html_content' => $s['html_content'] ?? null,
         'image_url' => $s['image_url'] ?? null,
     ];
-}, $slides), JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+}, $slides), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
 
 function markDirty(slideId) {
     dirtySlides.add(slideId);
