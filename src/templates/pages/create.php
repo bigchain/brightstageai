@@ -113,13 +113,25 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-6">
             <div class="flex items-center justify-between mb-2">
                 <h2 class="text-xl font-bold text-gray-900" id="preview-title"></h2>
-                <span class="text-sm text-gray-500" id="preview-count"></span>
+                <div class="flex items-center space-x-3">
+                    <span class="text-sm text-gray-500" id="preview-count"></span>
+                    <button onclick="addNewSlide()" class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                        + Add Slide
+                    </button>
+                </div>
             </div>
-            <p class="text-gray-500 text-sm mb-6">Review and edit your slides. Click any field to change it.</p>
+            <p class="text-gray-500 text-sm">Review and edit your slides. Add, remove, or reorder as needed.</p>
         </div>
 
         <!-- Slides Preview -->
         <div id="slides-preview" class="space-y-4"></div>
+
+        <!-- Add Slide Button (bottom) -->
+        <div class="mt-4">
+            <button onclick="addNewSlide()" class="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-brand-400 hover:text-brand-600 hover:bg-brand-50 transition">
+                + Add Another Slide
+            </button>
+        </div>
 
         <!-- Navigation -->
         <div class="mt-8 flex items-center justify-between">
@@ -308,45 +320,102 @@ async function generateOutline() {
 
 function renderSlidesPreview(data) {
     document.getElementById('preview-title').textContent = data.title;
-    document.getElementById('preview-count').textContent = `${data.slides.length} slides`;
+    updateSlideCount();
 
     const container = document.getElementById('slides-preview');
     container.innerHTML = '';
 
     data.slides.forEach((slide, i) => {
-        const isTitle = slide.layout_type === 'title';
-        const card = document.createElement('div');
-        card.className = 'bg-white rounded-xl border border-gray-200 overflow-hidden';
-        card.innerHTML = `
-            <div class="flex items-center px-6 py-3 bg-gray-50 border-b border-gray-100">
-                <span class="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold mr-3">${i + 1}</span>
-                <span class="text-xs text-gray-400 uppercase tracking-wide">${slide.layout_type || 'bullets'}</span>
-            </div>
-            <div class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-gray-400 mb-1">SLIDE TITLE</label>
-                    <input type="text" value="${escHtml(slide.title)}"
-                        class="w-full px-3 py-2 border border-gray-200 rounded-lg font-semibold text-gray-900 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
-                        onchange="outlineData.slides[${i}].title = this.value">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-1">SLIDE CONTENT</label>
-                        <textarea rows="${isTitle ? 2 : 5}"
-                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"
-                            onchange="outlineData.slides[${i}].content = this.value">${escHtml(slide.content)}</textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-1">NARRATION SCRIPT</label>
-                        <textarea rows="${isTitle ? 2 : 5}"
-                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"
-                            onchange="outlineData.slides[${i}].speaker_notes = this.value">${escHtml(slide.speaker_notes)}</textarea>
-                    </div>
-                </div>
-            </div>
-        `;
-        container.appendChild(card);
+        container.appendChild(createSlideCard(slide, i));
     });
+}
+
+function createSlideCard(slide, index) {
+    const isTitle = slide.layout_type === 'title';
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-xl border border-gray-200 overflow-hidden slide-preview-card';
+    card.dataset.index = index;
+    card.innerHTML = `
+        <div class="flex items-center justify-between px-6 py-3 bg-gray-50 border-b border-gray-100">
+            <div class="flex items-center">
+                <span class="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-xs font-bold mr-3 slide-number">${index + 1}</span>
+                <select class="text-xs text-gray-500 bg-transparent border-none outline-none cursor-pointer"
+                    onchange="outlineData.slides[${index}].layout_type = this.value">
+                    <option value="title" ${slide.layout_type === 'title' ? 'selected' : ''}>Title Slide</option>
+                    <option value="bullets" ${slide.layout_type === 'bullets' ? 'selected' : ''}>Bullets</option>
+                    <option value="quote" ${slide.layout_type === 'quote' ? 'selected' : ''}>Quote</option>
+                    <option value="image_left" ${slide.layout_type === 'image_left' ? 'selected' : ''}>Image Left</option>
+                    <option value="image_right" ${slide.layout_type === 'image_right' ? 'selected' : ''}>Image Right</option>
+                    <option value="two_column" ${slide.layout_type === 'two_column' ? 'selected' : ''}>Two Column</option>
+                </select>
+            </div>
+            <button onclick="removeSlide(${index})" class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition"
+                title="Remove this slide">&#10005; Remove</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">SLIDE TITLE</label>
+                <input type="text" value="${escHtml(slide.title)}"
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg font-semibold text-gray-900 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                    onchange="outlineData.slides[${index}].title = this.value">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">SLIDE CONTENT <span class="text-gray-300">(appears on slide)</span></label>
+                    <textarea rows="${isTitle ? 2 : 5}"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-y"
+                        onchange="outlineData.slides[${index}].content = this.value">${escHtml(slide.content)}</textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">NARRATION SCRIPT <span class="text-gray-300">(voiceover)</span></label>
+                    <textarea rows="${isTitle ? 2 : 5}"
+                        class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-y"
+                        onchange="outlineData.slides[${index}].speaker_notes = this.value">${escHtml(slide.speaker_notes)}</textarea>
+                </div>
+            </div>
+        </div>
+    `;
+    return card;
+}
+
+function addNewSlide() {
+    if (!outlineData) return;
+
+    const newSlide = {
+        slide_order: outlineData.slides.length + 1,
+        title: 'New Slide',
+        content: '- Add your first point here\n- Add your second point\n- Add your third point',
+        speaker_notes: 'Write what the presenter should say for this slide.',
+        layout_type: 'bullets',
+    };
+
+    outlineData.slides.push(newSlide);
+    const container = document.getElementById('slides-preview');
+    container.appendChild(createSlideCard(newSlide, outlineData.slides.length - 1));
+    updateSlideCount();
+
+    // Scroll to the new slide
+    container.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    container.lastElementChild.classList.add('ring-2', 'ring-brand-400');
+    setTimeout(() => container.lastElementChild.classList.remove('ring-2', 'ring-brand-400'), 2000);
+}
+
+function removeSlide(index) {
+    if (!outlineData || outlineData.slides.length <= 2) {
+        alert('You need at least 2 slides.');
+        return;
+    }
+
+    outlineData.slides.splice(index, 1);
+    // Re-number slide_order
+    outlineData.slides.forEach((s, i) => s.slide_order = i + 1);
+    // Re-render all (simplest way to keep indices correct)
+    renderSlidesPreview(outlineData);
+}
+
+function updateSlideCount() {
+    if (!outlineData) return;
+    document.getElementById('preview-count').textContent = `${outlineData.slides.length} slides`;
 }
 
 // ── Step 3: Save Presentation ──
