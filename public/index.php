@@ -65,6 +65,27 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiGenerateController())->upload_slide_image((int)$m[1]);
     }
 
+    // AI Polish slide content
+    if ($uri === '/api/polish-slide' && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $title = trim($input['title'] ?? '');
+        $content = trim($input['content'] ?? '');
+        $speaker_notes = trim($input['speaker_notes'] ?? '');
+        $tone = trim($input['tone'] ?? 'professional');
+
+        if ($title === '' && $content === '') json_error('Nothing to polish');
+
+        require_once APP_ROOT . '/src/services/SlidePolishService.php';
+        $service = new SlidePolishService();
+        $result = $service->polish($title, $content, $speaker_notes, $tone);
+
+        if ($result === null) json_error('Failed to polish. Try again.');
+        json_success($result);
+    }
+
     // Topic enhancement API — returns title + audience + description
     if ($uri === '/api/enhance-topic' && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
@@ -156,6 +177,68 @@ if (str_starts_with($uri, '/api/')) {
         json_success(['presentation_id' => $pres_id, 'redirect' => "/presentation/{$pres_id}"]);
     }
 
+    // Presentation management API
+    if (preg_match('#^/api/presentations/(\d+)$#', $uri, $m) && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $action = $input['_action'] ?? 'update';
+        $pres_id = (int)$m[1];
+        $user = current_user();
+
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/SlideModel.php';
+        $presentations = new PresentationModel();
+        $slides = new SlideModel();
+
+        $pres = $presentations->find_by_id($pres_id, $user['id']);
+        if (!$pres) json_error('Not found', 404);
+
+        if ($action === 'delete') {
+            $slides->delete_by_presentation($pres_id);
+            $presentations->delete($pres_id, $user['id']);
+            json_success(['message' => 'Deleted', 'redirect' => '/dashboard']);
+        }
+
+        if ($action === 'duplicate') {
+            $new_id = $presentations->create(
+                $user['id'],
+                $pres['title'] . ' (Copy)',
+                $pres['topic'],
+                $pres['audience'],
+                $pres['duration_minutes'],
+                $pres['tone']
+            );
+            $presentations->update($new_id, $user['id'], [
+                'template_id' => $pres['template_id'],
+                'status'      => $pres['status'],
+            ]);
+            // Duplicate slides
+            $original_slides = $slides->list_by_presentation($pres_id);
+            foreach ($original_slides as $s) {
+                $slides->create(
+                    $new_id, $s['slide_order'], $s['title'],
+                    $s['content'], $s['speaker_notes'], $s['layout_type']
+                );
+            }
+            json_success(['message' => 'Duplicated', 'presentation_id' => $new_id, 'redirect' => "/presentation/{$new_id}"]);
+        }
+
+        // Default: update
+        $data = [];
+        if (isset($input['title']))    $data['title'] = mb_substr(trim($input['title']), 0, 255);
+        if (isset($input['topic']))    $data['topic'] = mb_substr(trim($input['topic']), 0, 2000);
+        if (isset($input['audience'])) $data['audience'] = mb_substr(trim($input['audience']), 0, 200);
+        if (isset($input['tone']))     $data['tone'] = trim($input['tone']);
+        if (isset($input['template_id'])) $data['template_id'] = trim($input['template_id']);
+
+        if (!empty($data)) {
+            $presentations->update($pres_id, $user['id'], $data);
+        }
+        json_success(['message' => 'Updated']);
+    }
+
     // Auth API
     if ($uri === '/api/auth/me' && $method === 'GET') {
         if (!is_logged_in()) {
@@ -225,23 +308,10 @@ if ($uri === '/create' && $method === 'GET') {
     exit;
 }
 
-if ($uri === '/create' && $method === 'POST') {
-    require_once APP_ROOT . '/src/controllers/PresentationController.php';
-    (new PresentationController())->store();
-    exit;
-}
-
 // View/edit presentation
 if (preg_match('#^/presentation/(\d+)$#', $uri, $m) && $method === 'GET') {
     require_once APP_ROOT . '/src/controllers/PresentationController.php';
     (new PresentationController())->show((int)$m[1]);
-    exit;
-}
-
-// Delete presentation
-if (preg_match('#^/presentation/(\d+)/delete$#', $uri, $m) && $method === 'POST') {
-    require_once APP_ROOT . '/src/controllers/PresentationController.php';
-    (new PresentationController())->destroy((int)$m[1]);
     exit;
 }
 

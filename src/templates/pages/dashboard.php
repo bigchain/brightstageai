@@ -41,33 +41,84 @@
     <?php else: ?>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <?php foreach ($presentations as $pres): ?>
-        <a href="/presentation/<?= $pres['id'] ?>" class="slide-card bg-white rounded-xl border border-gray-200 p-6 block hover:border-brand-300">
-            <div class="flex items-start justify-between mb-3">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                    <?php
-                    echo match ($pres['status']) {
-                        'draft'         => 'bg-gray-100 text-gray-700',
-                        'outline_ready' => 'bg-blue-100 text-blue-700',
-                        'slides_ready'  => 'bg-purple-100 text-purple-700',
-                        'audio_ready'   => 'bg-green-100 text-green-700',
-                        'video_ready'   => 'bg-emerald-100 text-emerald-700',
-                        'exported'      => 'bg-amber-100 text-amber-700',
-                        default         => 'bg-gray-100 text-gray-700',
-                    };
-                    ?>">
-                    <?= ucfirst(str_replace('_', ' ', e($pres['status']))) ?>
-                </span>
-                <span class="text-xs text-gray-400"><?= $pres['slide_count'] ?> slides</span>
+        <div class="slide-card bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-brand-300" data-pres-id="<?= $pres['id'] ?>">
+            <a href="/presentation/<?= $pres['id'] ?>" class="block p-6 pb-3">
+                <div class="flex items-start justify-between mb-3">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        <?php
+                        echo match ($pres['status']) {
+                            'draft'         => 'bg-gray-100 text-gray-700',
+                            'outline_ready' => 'bg-blue-100 text-blue-700',
+                            'slides_ready'  => 'bg-purple-100 text-purple-700',
+                            'audio_ready'   => 'bg-green-100 text-green-700',
+                            'video_ready'   => 'bg-emerald-100 text-emerald-700',
+                            'exported'      => 'bg-amber-100 text-amber-700',
+                            default         => 'bg-gray-100 text-gray-700',
+                        };
+                        ?>">
+                        <?= ucfirst(str_replace('_', ' ', e($pres['status']))) ?>
+                    </span>
+                    <span class="text-xs text-gray-400"><?= $pres['slide_count'] ?> slides</span>
+                </div>
+                <h3 class="font-semibold text-gray-900 mb-1 line-clamp-2"><?= e($pres['title']) ?></h3>
+                <p class="text-sm text-gray-500 line-clamp-2 mb-2"><?= e($pres['topic']) ?></p>
+                <div class="flex items-center text-xs text-gray-400 space-x-3">
+                    <span><?= $pres['duration_minutes'] ?> min</span>
+                    <span>&middot;</span>
+                    <span><?= date('M j, Y', strtotime($pres['updated_at'])) ?></span>
+                </div>
+            </a>
+            <!-- Actions -->
+            <div class="flex items-center border-t border-gray-100 divide-x divide-gray-100">
+                <a href="/presentation/<?= $pres['id'] ?>" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-brand-600 hover:bg-brand-50 transition">
+                    Edit
+                </a>
+                <button onclick="duplicateProject(<?= $pres['id'] ?>)" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition">
+                    Duplicate
+                </button>
+                <button onclick="renameProject(<?= $pres['id'] ?>, '<?= e(addslashes($pres['title'])) ?>')" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition">
+                    Rename
+                </button>
+                <button onclick="deleteProject(<?= $pres['id'] ?>, '<?= e(addslashes($pres['title'])) ?>')" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition">
+                    Delete
+                </button>
             </div>
-            <h3 class="font-semibold text-gray-900 mb-1 line-clamp-2"><?= e($pres['title']) ?></h3>
-            <p class="text-sm text-gray-500 line-clamp-2 mb-3"><?= e($pres['topic']) ?></p>
-            <div class="flex items-center text-xs text-gray-400 space-x-3">
-                <span><?= $pres['duration_minutes'] ?> min</span>
-                <span>&middot;</span>
-                <span><?= date('M j, Y', strtotime($pres['updated_at'])) ?></span>
-            </div>
-        </a>
+        </div>
         <?php endforeach; ?>
     </div>
     <?php endif; ?>
 </div>
+
+<script>
+async function deleteProject(id, title) {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+
+    const result = await api(`/api/presentations/${id}`, { _action: 'delete' });
+    if (result.success) {
+        document.querySelector(`[data-pres-id="${id}"]`).remove();
+    } else {
+        alert(result.error || 'Failed to delete');
+    }
+}
+
+async function duplicateProject(id) {
+    const result = await api(`/api/presentations/${id}`, { _action: 'duplicate' });
+    if (result.success) {
+        window.location.href = result.data.redirect;
+    } else {
+        alert(result.error || 'Failed to duplicate');
+    }
+}
+
+async function renameProject(id, currentTitle) {
+    const newTitle = prompt('New title:', currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
+
+    const result = await api(`/api/presentations/${id}`, { title: newTitle });
+    if (result.success) {
+        location.reload();
+    } else {
+        alert(result.error || 'Failed to rename');
+    }
+}
+</script>

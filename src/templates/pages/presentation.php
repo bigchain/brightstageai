@@ -30,12 +30,12 @@
             <button onclick="addSlide()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
                 + Add Slide
             </button>
-            <form method="POST" action="/presentation/<?= $presentation['id'] ?>/delete" onsubmit="return confirm('Delete this presentation and all its slides?')">
-                <?= csrf_field() ?>
-                <button type="submit" class="inline-flex items-center px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition">
-                    Delete
-                </button>
-            </form>
+            <button onclick="duplicatePresentation()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                Duplicate
+            </button>
+            <button onclick="deletePresentation()" class="inline-flex items-center px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition">
+                Delete
+            </button>
         </div>
     </div>
 
@@ -315,4 +315,19 @@ document.querySelectorAll('.slide-field').forEach(field => {
 window.addEventListener('beforeunload', (e) => {
     if (dirtySlides.size > 0) { e.preventDefault(); e.returnValue = ''; }
 });
+
+// ── Project Management ──
+
+async function deletePresentation() {
+    if (!confirm('Delete this presentation and all its slides? This cannot be undone.')) return;
+    const result = await api(`/api/presentations/${PRESENTATION_ID}`, { _action: 'delete' });
+    if (result.success) window.location.href = '/dashboard';
+    else alert(result.error || 'Failed to delete');
+}
+
+async function duplicatePresentation() {
+    const result = await api(`/api/presentations/${PRESENTATION_ID}`, { _action: 'duplicate' });
+    if (result.success) window.location.href = result.data.redirect;
+    else alert(result.error || 'Failed to duplicate');
+}
 </script>

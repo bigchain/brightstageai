@@ -349,8 +349,12 @@ function createSlideCard(slide, index) {
                     <option value="two_column" ${slide.layout_type === 'two_column' ? 'selected' : ''}>Two Column</option>
                 </select>
             </div>
-            <button onclick="removeSlide(${index})" class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition"
-                title="Remove this slide">&#10005; Remove</button>
+            <div class="flex items-center space-x-2">
+                <button onclick="polishSlide(${index})" class="text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded transition font-medium polish-btn" id="polish-btn-${index}"
+                    title="AI will improve grammar, make bullets punchier, and smooth narration">&#10024; AI Polish</button>
+                <button onclick="removeSlide(${index})" class="text-xs text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition"
+                    title="Remove this slide">&#10005; Remove</button>
+            </div>
         </div>
         <div class="p-6 space-y-4">
             <div>
@@ -416,6 +420,49 @@ function removeSlide(index) {
 function updateSlideCount() {
     if (!outlineData) return;
     document.getElementById('preview-count').textContent = `${outlineData.slides.length} slides`;
+}
+
+// ── AI Polish per slide ──
+
+async function polishSlide(index) {
+    const slide = outlineData.slides[index];
+    if (!slide) return;
+
+    const btn = document.getElementById(`polish-btn-${index}`);
+    btn.disabled = true;
+    btn.innerHTML = '&#9889; Polishing...';
+    btn.classList.add('opacity-50');
+
+    const tone = document.getElementById('tone').value;
+    const result = await api('/api/polish-slide', {
+        title: slide.title,
+        content: slide.content,
+        speaker_notes: slide.speaker_notes,
+        tone,
+    });
+
+    btn.disabled = false;
+    btn.innerHTML = '&#10024; AI Polish';
+    btn.classList.remove('opacity-50');
+
+    if (result.success) {
+        // Update data
+        outlineData.slides[index].title = result.data.title;
+        outlineData.slides[index].content = result.data.content;
+        outlineData.slides[index].speaker_notes = result.data.speaker_notes;
+
+        // Re-render just this card
+        const container = document.getElementById('slides-preview');
+        const cards = container.querySelectorAll('.slide-preview-card');
+        const newCard = createSlideCard(outlineData.slides[index], index);
+        cards[index].replaceWith(newCard);
+
+        // Flash green to show it worked
+        newCard.classList.add('ring-2', 'ring-green-400');
+        setTimeout(() => newCard.classList.remove('ring-2', 'ring-green-400'), 2000);
+    } else {
+        alert(result.error || 'Polish failed. Try again.');
+    }
 }
 
 // ── Step 3: Save Presentation ──
