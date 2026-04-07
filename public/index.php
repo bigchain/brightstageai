@@ -65,6 +65,117 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiGenerateController())->upload_slide_image((int)$m[1]);
     }
 
+    // Upload custom slide image (file upload, not base64)
+    if (preg_match('#^/api/presentations/(\d+)/upload-slides$#', $uri, $m) && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        // CSRF via header (can't use JSON body for file uploads)
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $pres_id = (int)$m[1];
+        $user = current_user();
+
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/SlideModel.php';
+        $presentations = new PresentationModel();
+        $slideModel = new SlideModel();
+
+        $pres = $presentations->find_by_id($pres_id, $user['id']);
+        if (!$pres) json_error('Not found', 404);
+
+        if (empty($_FILES['slides'])) json_error('No files uploaded');
+
+        $files = $_FILES['slides'];
+        $uploaded = 0;
+        $slides = $slideModel->list_by_presentation($pres_id);
+
+        // Process each uploaded file
+        $file_count = is_array($files['name']) ? count($files['name']) : 1;
+        for ($i = 0; $i < $file_count; $i++) {
+            $name = is_array($files['name']) ? $files['name'][$i] : $files['name'];
+            $tmp = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
+            $size = is_array($files['size']) ? $files['size'][$i] : $files['size'];
+            $error = is_array($files['error']) ? $files['error'][$i] : $files['error'];
+
+            if ($error !== UPLOAD_ERR_OK) continue;
+            if ($size > 10 * 1024 * 1024) continue; // 10MB max per file
+
+            // Validate image type
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) continue;
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $tmp);
+            finfo_close($finfo);
+            if (!in_array($mime, ['image/png', 'image/jpeg', 'image/webp'], true)) continue;
+
+            // Save to storage
+            $storage_path = user_storage_path($user['id'], $pres_id);
+            $slides_dir = $storage_path . '/slides';
+            if (!is_dir($slides_dir)) mkdir($slides_dir, 0755, true);
+
+            $slide_order = $i + 1;
+            $filename = "slide_{$slide_order}.{$ext}";
+            move_uploaded_file($tmp, $slides_dir . '/' . $filename);
+
+            $relative_url = "/storage/users/{$user['id']}/presentations/{$pres_id}/slides/{$filename}";
+
+            // Update existing slide or create new one
+            if (isset($slides[$i])) {
+                $slideModel->update($slides[$i]['id'], ['image_url' => $relative_url]);
+            } else {
+                $sid = $slideModel->create($pres_id, $slide_order, "Slide {$slide_order}", '', '', 'bullets');
+                $slideModel->update($sid, ['image_url' => $relative_url]);
+            }
+            $uploaded++;
+        }
+
+        if ($uploaded > 0) {
+            $presentations->update_status($pres_id, 'slides_ready');
+        }
+
+        json_success(['uploaded' => $uploaded, 'message' => "{$uploaded} slides uploaded"]);
+    }
+
+    // Download slides as PDF
+    if (preg_match('#^/api/presentations/(\d+)/download-pdf$#', $uri, $m) && $method === 'GET') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+
+        $pres_id = (int)$m[1];
+        $user = current_user();
+
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/SlideModel.php';
+        $presentations = new PresentationModel();
+        $slideModel = new SlideModel();
+
+        $pres = $presentations->find_by_id($pres_id, $user['id']);
+        if (!$pres) json_error('Not found', 404);
+
+        $slides = $slideModel->list_by_presentation($pres_id);
+        $image_urls = [];
+        foreach ($slides as $s) {
+            if (!empty($s['image_url'])) {
+                $full_path = APP_ROOT . '/public' . $s['image_url'];
+                if (file_exists($full_path)) $image_urls[] = $full_path;
+            }
+        }
+
+        if (empty($image_urls)) json_error('No rendered slides. Render slides first.');
+
+        // Generate simple HTML that browsers can print to PDF
+        header('Content-Type: text/html');
+        echo '<!DOCTYPE html><html><head><title>' . htmlspecialchars($pres['title']) . '</title>';
+        echo '<style>@page{size:landscape;margin:0}body{margin:0}img{width:100vw;height:100vh;object-fit:contain;page-break-after:always;display:block}</style>';
+        echo '</head><body>';
+        foreach ($image_urls as $path) {
+            $data = base64_encode(file_get_contents($path));
+            $mime = mime_content_type($path);
+            echo "<img src=\"data:{$mime};base64,{$data}\">";
+        }
+        echo '</body></html>';
+        exit;
+    }
+
     // AI Polish slide content
     if ($uri === '/api/polish-slide' && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);

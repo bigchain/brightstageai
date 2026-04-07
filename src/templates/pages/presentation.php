@@ -26,16 +26,14 @@
                 <?= e($presentation['audience']) ?> &middot; <?= $presentation['duration_minutes'] ?> min &middot; <?= ucfirst(e($presentation['tone'])) ?>
             </p>
         </div>
-        <div class="flex items-center space-x-3">
-            <button onclick="addSlide()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
-                + Add Slide
-            </button>
-            <button onclick="duplicatePresentation()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
-                Duplicate
-            </button>
-            <button onclick="deletePresentation()" class="inline-flex items-center px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition">
-                Delete
-            </button>
+        <div class="flex items-center space-x-2">
+            <button onclick="addSlide()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">+ Add Slide</button>
+            <button onclick="openSlideshow()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#9654; Preview</button>
+            <button onclick="downloadPDF()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#128196; PDF</button>
+            <button onclick="document.getElementById('upload-slides-input').click()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#128228; Upload Slides</button>
+            <button onclick="duplicatePresentation()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-500 bg-white hover:bg-gray-50 transition">Duplicate</button>
+            <button onclick="deletePresentation()" class="inline-flex items-center px-3 py-2 border border-red-200 rounded-lg text-xs font-medium text-red-500 bg-white hover:bg-red-50 transition">Delete</button>
+            <input type="file" id="upload-slides-input" accept="image/png,image/jpeg,image/webp" multiple class="hidden" onchange="uploadSlides(this.files)">
         </div>
     </div>
 
@@ -204,10 +202,10 @@
     <?php endif; ?>
 </div>
 
-<!-- html2canvas library -->
+<!-- Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<!-- Slide Renderer -->
 <script src="/assets/js/slide-renderer.js"></script>
+<script src="/assets/js/slideshow.js"></script>
 
 <script>
 const PRESENTATION_ID = <?= $presentation['id'] ?>;
@@ -218,7 +216,9 @@ const SLIDES_DATA = <?= json_encode(array_map(function($s) {
     return [
         'id' => $s['id'],
         'slide_order' => $s['slide_order'],
+        'title' => $s['title'] ?? '',
         'html_content' => $s['html_content'] ?? null,
+        'image_url' => $s['image_url'] ?? null,
     ];
 }, $slides), JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
@@ -363,5 +363,69 @@ async function duplicatePresentation() {
     const result = await api(`/api/presentations/${PRESENTATION_ID}`, { _action: 'duplicate' });
     if (result.success) window.location.href = result.data.redirect;
     else alert(result.error || 'Failed to duplicate');
+}
+
+// ── Slideshow Preview ──
+
+function openSlideshow() {
+    const slidesForShow = SLIDES_DATA.map(s => ({
+        image_url: s.image_url || null,
+        title: s.title || `Slide ${s.slide_order}`,
+        slide_order: s.slide_order,
+    })).filter(s => s.image_url);
+
+    if (slidesForShow.length === 0) {
+        alert('No rendered slide images yet. Render your slides first.');
+        return;
+    }
+    Slideshow.open(slidesForShow);
+}
+
+// ── Upload Custom Slides ──
+
+async function uploadSlides(files) {
+    if (!files || files.length === 0) return;
+
+    showProgress('Uploading slides...', 10);
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('slides[]', files[i]);
+    }
+    formData.append('_csrf', CSRF_TOKEN);
+
+    try {
+        const res = await fetch(`/api/presentations/${PRESENTATION_ID}/upload-slides`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': CSRF_TOKEN },
+            body: formData,
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            showProgress(`${result.data.uploaded} slides uploaded! Reloading...`, 100);
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            hideProgress();
+            alert(result.error || 'Upload failed');
+        }
+    } catch (err) {
+        hideProgress();
+        alert('Upload failed. Check your connection.');
+    }
+
+    // Reset file input
+    document.getElementById('upload-slides-input').value = '';
+}
+
+// ── Download PDF ──
+
+function downloadPDF() {
+    const hasImages = SLIDES_DATA.some(s => s.image_url);
+    if (!hasImages) {
+        alert('No rendered slides yet. Render your slides first.');
+        return;
+    }
+    window.open(`/api/presentations/${PRESENTATION_ID}/download-pdf`, '_blank');
 }
 </script>
