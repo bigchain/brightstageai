@@ -81,7 +81,7 @@ class ApiSlideController
         if (isset($input['content']))       $data['content']       = $this->sanitize_field($input['content'], 10000);
         if (isset($input['speaker_notes'])) $data['speaker_notes'] = $this->sanitize_field($input['speaker_notes'], 10000);
         if (isset($input['layout_type'])) {
-            $allowed_layouts = ['title', 'bullets', 'image_left', 'image_right', 'full_image', 'two_column', 'quote'];
+            $allowed_layouts = ['title', 'bullets', 'quote', 'image_left', 'image_right', 'two_column'];
             if (in_array($input['layout_type'], $allowed_layouts, true)) {
                 $data['layout_type'] = $input['layout_type'];
             }

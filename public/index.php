@@ -150,7 +150,7 @@ if (str_starts_with($uri, '/api/')) {
         $tone        = trim($input['tone'] ?? 'professional');
         if (!in_array($tone, ['professional','casual','academic','inspirational','technical','sales'], true)) $tone = 'professional';
         $template_id = trim($input['template_id'] ?? '1');
-        if (!in_array($template_id, ['1','2','3','4','5'], true)) $template_id = '1';
+        if (!in_array($template_id, ['1','2','3','4','5','6','7'], true)) $template_id = '1';
         $slides      = $input['slides'] ?? [];
 
         if ($title === '' || $topic === '' || empty($slides)) {

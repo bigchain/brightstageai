@@ -24,7 +24,7 @@ class SlideGenerationService
         $system_prompt = <<<'PROMPT'
 You are an expert web designer creating presentation slides. Generate a single slide as a self-contained HTML div.
 
-RULES:
+GENERAL RULES:
 - Output ONLY the HTML for the slide. No doctype, no head, no body tags.
 - The slide must be exactly 1920x1080 pixels (16:9 aspect ratio).
 - Use inline CSS only (no external stylesheets).
@@ -33,12 +33,18 @@ RULES:
 - Text must be large and readable from a distance (titles: 48-72px, body: 24-32px).
 - Maximum 5 bullet points per slide. Keep text concise.
 - Use the provided color scheme and font choices.
-- For title slides: large centered title, subtitle below, gradient background.
-- For bullet slides: title on top, bullets below with generous spacing.
 - Add subtle decorative elements (shapes, accent lines, corner dots) for visual interest.
 - NEVER include JavaScript, forms, inputs, links, or interactive elements.
 - NEVER include <script> tags or event handlers.
 - The output should look like a professionally designed Canva/Pitch slide.
+
+LAYOUT TYPES — design MUST match the requested layout:
+- "title": Large centered title with subtitle below. Full gradient background. Minimal text, maximum impact. Big bold heading (72px+), elegant subtitle (28px). Centered vertically and horizontally.
+- "bullets": Title at top-left, bullet points below with generous spacing (40px between items). Each bullet has a colored accent dot/icon. Clean left-aligned layout.
+- "quote": Large quotation mark icon (decorative). The content is displayed as a featured quote in large italic text (36-48px), centered. Attribution/source below in smaller text. Elegant, spacious layout.
+- "image_left": Split layout — left 45% has a colored placeholder area (use a gradient box with an icon or pattern as image placeholder), right 55% has the title and bullet points. Content flows on the right side.
+- "image_right": Split layout — left 55% has the title and bullet points, right 45% has a colored placeholder area (gradient box with icon/pattern). Mirror of image_left.
+- "two_column": Title spans full width at top. Below: two equal columns side by side. Split the content bullets roughly in half between columns. Each column has its own subtle background or border.
 PROMPT;
 
         $colors = $template_config;

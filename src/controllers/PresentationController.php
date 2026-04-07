@@ -74,7 +74,7 @@ class PresentationController
         }
 
         // Validate template
-        $allowed_templates = ['1', '2', '3', '4', '5'];
+        $allowed_templates = ['1', '2', '3', '4', '5', '6', '7'];
         $template_id = $_POST['template_id'] ?? '1';
         if (!in_array($template_id, $allowed_templates, true)) {
             $template_id = '1';

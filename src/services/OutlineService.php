@@ -40,7 +40,13 @@ SLIDE CONTENT rules:
 - Each bullet should be 1-2 sentences with real value for the audience
 - First slide is always a title slide (layout_type: "title") with a compelling subtitle as content
 - Last slide is a closing/CTA slide (layout_type: "title")
-- Use a mix of layout types: "title", "bullets", "quote" for variety
+- Use a mix of layout types for visual variety:
+  * "title" — for opening and closing slides (centered, impactful)
+  * "bullets" — standard content slides (most common)
+  * "quote" — for a key insight, stat, or memorable quote (1-2 per presentation)
+  * "image_left" — content with visual emphasis on the left (use when describing something visual)
+  * "image_right" — content with visual emphasis on the right
+  * "two_column" — for comparisons, before/after, pros/cons
 
 SPEAKER NOTES rules (this becomes the voiceover narration):
 - Write 3-5 natural, conversational sentences per slide
@@ -122,7 +128,7 @@ PROMPT;
             if (!is_array($slide)) continue;
             if ($i >= 50) break; // Hard cap
 
-            $valid_layouts = ['title', 'bullets', 'image_left', 'image_right', 'full_image', 'two_column', 'quote'];
+            $valid_layouts = ['title', 'bullets', 'quote', 'image_left', 'image_right', 'two_column'];
             $layout = in_array($slide['layout_type'] ?? '', $valid_layouts, true)
                 ? $slide['layout_type']
                 : 'bullets';
