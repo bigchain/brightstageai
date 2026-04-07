@@ -65,24 +65,95 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiGenerateController())->upload_slide_image((int)$m[1]);
     }
 
-    // Topic enhancement API
+    // Topic enhancement API — returns title + audience + description
     if ($uri === '/api/enhance-topic' && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
         if (!verify_csrf()) json_error('Invalid CSRF token', 403);
 
         $input = json_decode(file_get_contents('php://input'), true);
         $topic = trim($input['topic'] ?? '');
-        $audience = trim($input['audience'] ?? 'General audience');
         $tone = trim($input['tone'] ?? 'professional');
 
         if ($topic === '') json_error('Topic is required');
 
         require_once APP_ROOT . '/src/services/TopicEnhancerService.php';
         $service = new TopicEnhancerService();
-        $enhanced = $service->enhance($topic, $audience, $tone);
+        $result = $service->enhance($topic, $tone);
 
-        if ($enhanced === null) json_error('Failed to enhance topic. Try again.');
-        json_success(['enhanced_topic' => $enhanced]);
+        if ($result === null) json_error('Failed to enhance topic. Try again.');
+        json_success($result);
+    }
+
+    // Generate outline preview (AJAX — returns slides without saving)
+    if ($uri === '/api/generate/outline-preview' && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $topic    = mb_substr(trim($input['topic'] ?? ''), 0, 2000);
+        $audience = mb_substr(trim($input['audience'] ?? ''), 0, 200);
+        $duration = (int)($input['duration'] ?? 10);
+        $tone     = trim($input['tone'] ?? 'professional');
+
+        if ($topic === '') json_error('Topic is required');
+
+        // Check credits
+        $user = current_user();
+        require_once APP_ROOT . '/src/models/UserModel.php';
+        $users = new UserModel();
+        $balance = $users->get_credits($user['id']);
+        $cost = CREDIT_COSTS['generate_outline'];
+        if ($balance < $cost) json_error("Not enough credits. Need {$cost}, have {$balance}.");
+
+        require_once APP_ROOT . '/src/services/OutlineService.php';
+        $service = new OutlineService();
+        $outline = $service->generate($topic, $audience, $duration, $tone);
+
+        if ($outline === null) json_error('Failed to generate outline. Try again.');
+        json_success($outline);
+    }
+
+    // Save confirmed outline (after preview)
+    if ($uri === '/api/presentations/create' && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $user = current_user();
+
+        $title       = mb_substr(trim($input['title'] ?? ''), 0, 255);
+        $topic       = mb_substr(trim($input['topic'] ?? ''), 0, 2000);
+        $audience    = mb_substr(trim($input['audience'] ?? ''), 0, 200);
+        $duration    = (int)($input['duration'] ?? 10);
+        $tone        = trim($input['tone'] ?? 'professional');
+        $template_id = trim($input['template_id'] ?? '1');
+        $slides      = $input['slides'] ?? [];
+
+        if ($title === '' || $topic === '' || empty($slides)) {
+            json_error('Title, topic, and slides are required');
+        }
+
+        // Deduct credits
+        require_once APP_ROOT . '/src/models/UserModel.php';
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/SlideModel.php';
+
+        $users = new UserModel();
+        $cost = CREDIT_COSTS['generate_outline'];
+        if (!$users->deduct_credits($user['id'], $cost, 'generate_outline')) {
+            json_error('Not enough credits');
+        }
+
+        // Create presentation
+        $presentations = new PresentationModel();
+        $pres_id = $presentations->create($user['id'], $title, $topic, $audience, $duration, $tone);
+        $presentations->update($pres_id, $user['id'], ['template_id' => $template_id, 'status' => 'outline_ready']);
+
+        // Create slides
+        $slideModel = new SlideModel();
+        $slideModel->create_batch($pres_id, $slides);
+
+        json_success(['presentation_id' => $pres_id, 'redirect' => "/presentation/{$pres_id}"]);
     }
 
     // Auth API
