@@ -1,0 +1,32 @@
+# Environment & secrets
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temp files
+.tmp/
+*.tmp
+*.log
+
+# Dependencies (if any)
+node_modules/
+vendor/
+
+# Uploaded/generated files
+uploads/
+generated/
+storage/
+
+# Reference codebases (read-only, not part of our project)
+SurfSense-main/
