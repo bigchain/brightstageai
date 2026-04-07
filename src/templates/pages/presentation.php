@@ -63,17 +63,19 @@
         <?php foreach ($slides as $slide): ?>
         <div class="slide-card bg-white rounded-xl border border-gray-200 overflow-hidden" data-slide-id="<?= $slide['id'] ?>" id="slide-<?= $slide['id'] ?>">
 
-            <!-- Slide Preview (shown when HTML is generated) -->
-            <?php if (!empty($slide['image_url']) || !empty($slide['html_content'])): ?>
-            <div class="bg-gray-900 p-4 flex justify-center">
+            <!-- Slide Preview -->
+            <?php if (!empty($slide['image_url'])): ?>
+            <div class="bg-gray-100 p-3 flex justify-center border-b border-gray-200">
                 <img id="slide-preview-<?= $slide['id'] ?>"
-                    src="<?= !empty($slide['image_url']) ? e($slide['image_url']) : '' ?>"
+                    src="<?= e($slide['image_url']) ?>"
                     alt="Slide <?= $slide['slide_order'] ?> preview"
-                    class="rounded shadow-lg <?= empty($slide['image_url']) ? 'hidden' : '' ?>"
-                    style="max-height: 300px; width: auto;">
-                <?php if (!empty($slide['html_content']) && empty($slide['image_url'])): ?>
-                <div class="text-gray-400 text-sm py-8">Slide designed. Click "Render Slides" to generate previews.</div>
-                <?php endif; ?>
+                    class="rounded-lg shadow-md"
+                    style="max-height: 280px; width: auto;">
+            </div>
+            <?php elseif (!empty($slide['html_content'])): ?>
+            <div class="bg-gradient-to-r from-purple-50 to-blue-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
+                <span class="text-xs text-purple-600">&#10024; Design ready — click <strong>Render Slides</strong> below to see preview</span>
+                <img id="slide-preview-<?= $slide['id'] ?>" class="hidden rounded-lg shadow-md" style="max-height: 280px;">
             </div>
             <?php endif; ?>
 
@@ -135,34 +137,66 @@
         <?php endforeach; ?>
     </div>
 
-    <!-- Bottom Actions -->
-    <div class="mt-8 bg-white rounded-xl border border-gray-200 p-6">
-        <div class="flex items-center justify-between">
+    <?php
+    $has_html = false;
+    $has_images = false;
+    foreach ($slides as $s) {
+        if (!empty($s['html_content'])) $has_html = true;
+        if (!empty($s['image_url'])) $has_images = true;
+    }
+    ?>
+
+    <!-- Next Steps Bar -->
+    <div class="mt-8 space-y-3">
+        <!-- Save -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
             <div class="text-sm text-gray-500">
-                <?= count($slides) ?> slide<?= count($slides) !== 1 ? 's' : '' ?> &middot;
-                ~<?= $presentation['duration_minutes'] ?> minutes
+                <?= count($slides) ?> slide<?= count($slides) !== 1 ? 's' : '' ?> &middot; ~<?= $presentation['duration_minutes'] ?> min
             </div>
-            <div class="flex items-center space-x-3">
-                <button onclick="saveAllSlides()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
-                    Save All Changes
-                </button>
+            <button onclick="saveAllSlides()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                Save All Changes
+            </button>
+        </div>
 
-                <!-- Phase 2: Generate Slide Designs -->
+        <!-- Step-by-step pipeline -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Pipeline</p>
+            <div class="grid grid-cols-<?= $has_html ? ($has_images ? '4' : '3') : '2' ?> gap-3">
+
+                <!-- Step 1: Design -->
                 <button onclick="generateSlideDesigns()" id="btn-generate-slides"
-                    class="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition">
-                    &#10024; Design Slides (<?= count($slides) * CREDIT_COSTS['generate_slide'] ?> credits)
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_html ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50 ring-2 ring-purple-200' ?> transition hover:shadow-sm text-center">
+                    <span class="text-2xl mb-2"><?= $has_html ? '&#10003;' : '&#10024;' ?></span>
+                    <span class="text-xs font-semibold <?= $has_html ? 'text-green-700' : 'text-purple-700' ?>">
+                        <?= $has_html ? 'Redesign Slides' : 'Design Slides' ?>
+                    </span>
+                    <span class="text-xs text-gray-400 mt-1"><?= count($slides) * CREDIT_COSTS['generate_slide'] ?> credits</span>
                 </button>
 
-                <!-- Phase 2: Render to PNG -->
-                <?php
-                $has_html = false;
-                foreach ($slides as $s) { if (!empty($s['html_content'])) { $has_html = true; break; } }
-                ?>
+                <!-- Step 2: Render -->
                 <?php if ($has_html): ?>
                 <button onclick="renderAllSlides()" id="btn-render-slides"
-                    class="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition">
-                    &#127912; Render Slides to Images
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_images ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50 ring-2 ring-blue-200' ?> transition hover:shadow-sm text-center">
+                    <span class="text-2xl mb-2"><?= $has_images ? '&#10003;' : '&#127912;' ?></span>
+                    <span class="text-xs font-semibold <?= $has_images ? 'text-green-700' : 'text-blue-700' ?>">Render Previews</span>
+                    <span class="text-xs text-gray-400 mt-1">Free</span>
                 </button>
+                <?php endif; ?>
+
+                <!-- Step 3: Audio (Phase 3 — coming soon) -->
+                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-50">
+                    <span class="text-2xl mb-2">&#127908;</span>
+                    <span class="text-xs font-semibold text-gray-400">Generate Audio</span>
+                    <span class="text-xs text-gray-300 mt-1">Coming soon</span>
+                </div>
+
+                <!-- Step 4: Video (Phase 3 — coming soon) -->
+                <?php if ($has_html): ?>
+                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-50">
+                    <span class="text-2xl mb-2">&#127916;</span>
+                    <span class="text-xs font-semibold text-gray-400">Generate Video</span>
+                    <span class="text-xs text-gray-300 mt-1">Coming soon</span>
+                </div>
                 <?php endif; ?>
             </div>
         </div>
