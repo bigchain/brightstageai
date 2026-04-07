@@ -75,21 +75,20 @@
                 <span class="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">All fields editable</span>
             </div>
 
-            <div class="space-y-4">
+            <!-- Hidden field to store description (uses topic textarea value) -->
+            <input type="hidden" id="gen-description">
+
+            <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">Presentation Title</label>
                     <input type="text" id="gen-title"
                         class="w-full px-4 py-3 border border-gray-200 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                    <textarea id="gen-description" rows="3"
-                        class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"></textarea>
-                </div>
-                <div>
                     <label class="block text-xs font-medium text-gray-500 mb-1">Target Audience</label>
                     <input type="text" id="gen-audience"
-                        class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                        class="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                        style="padding-top: 0.95rem; padding-bottom: 0.95rem;">
                 </div>
             </div>
 
@@ -279,7 +278,7 @@ async function generateOutline() {
 
     const tone = document.getElementById('tone').value;
     const duration = document.getElementById('duration').value;
-    const topic = document.getElementById('gen-description').value.trim();
+    const topic = document.getElementById('topic').value.trim();
     const audience = document.getElementById('gen-audience').value.trim();
 
     if (!topic) {
@@ -474,7 +473,7 @@ async function savePresentation() {
 
     // Collect final data
     const title = document.getElementById('gen-title').value;
-    const topic = document.getElementById('gen-description').value;
+    const topic = document.getElementById('topic').value;
     const audience = document.getElementById('gen-audience').value;
     const duration = parseInt(document.getElementById('duration').value);
     const tone = document.getElementById('tone').value;
