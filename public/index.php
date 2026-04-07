@@ -75,6 +75,7 @@ if (str_starts_with($uri, '/api/')) {
         $content = trim($input['content'] ?? '');
         $speaker_notes = trim($input['speaker_notes'] ?? '');
         $tone = trim($input['tone'] ?? 'professional');
+        if (!in_array($tone, ['professional','casual','academic','inspirational','technical','sales'], true)) $tone = 'professional';
 
         if ($title === '' && $content === '') json_error('Nothing to polish');
 
@@ -147,7 +148,9 @@ if (str_starts_with($uri, '/api/')) {
         $audience    = mb_substr(trim($input['audience'] ?? ''), 0, 200);
         $duration    = (int)($input['duration'] ?? 10);
         $tone        = trim($input['tone'] ?? 'professional');
+        if (!in_array($tone, ['professional','casual','academic','inspirational','technical','sales'], true)) $tone = 'professional';
         $template_id = trim($input['template_id'] ?? '1');
+        if (!in_array($template_id, ['1','2','3','4','5'], true)) $template_id = '1';
         $slides      = $input['slides'] ?? [];
 
         if ($title === '' || $topic === '' || empty($slides)) {

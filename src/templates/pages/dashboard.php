@@ -76,10 +76,10 @@
                 <button onclick="duplicateProject(<?= $pres['id'] ?>)" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition">
                     Duplicate
                 </button>
-                <button onclick="renameProject(<?= $pres['id'] ?>, '<?= e(addslashes($pres['title'])) ?>')" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition">
+                <button onclick="renameProject(<?= $pres['id'] ?>, <?= e(json_encode($pres['title'])) ?>)" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition">
                     Rename
                 </button>
-                <button onclick="deleteProject(<?= $pres['id'] ?>, '<?= e(addslashes($pres['title'])) ?>')" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition">
+                <button onclick="deleteProject(<?= $pres['id'] ?>, <?= e(json_encode($pres['title'])) ?>)" class="flex-1 py-2.5 text-center text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition">
                     Delete
                 </button>
             </div>

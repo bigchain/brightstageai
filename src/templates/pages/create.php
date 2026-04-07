@@ -218,6 +218,7 @@
 
 <script>
 let outlineData = null; // Stores the generated outline
+let isBusy = false;     // Prevents concurrent API calls
 
 // ── Step Navigation ──
 
@@ -243,14 +244,22 @@ function goToStep(step) {
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Auto-preview template when entering Step 3
+    if (step === 3 && typeof previewTemplate === 'function') {
+        const checked = document.querySelector('input[name="template_id"]:checked');
+        if (checked) checked.closest('label').click();
+    }
 }
 
 // ── Step 1a: AI Enhance (topic → title + description + audience) ──
 
 async function enhanceTopic() {
+    if (isBusy) return;
     const topicEl = document.getElementById('topic');
     const topic = topicEl.value.trim();
     if (topic.length < 2) { topicEl.focus(); return; }
+    isBusy = true;
 
     const btn = document.getElementById('btn-enhance');
     btn.disabled = true;
@@ -266,6 +275,7 @@ async function enhanceTopic() {
     btn.innerHTML = '&#10024; AI Enhance';
 
     if (!enhanced.success) {
+        isBusy = false;
         alert(enhanced.error || 'Failed to enhance. Try again.');
         return;
     }
@@ -284,11 +294,14 @@ async function enhanceTopic() {
     document.getElementById('enhanced-preview').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     document.getElementById('topic-hint').innerHTML = '<span class="text-green-600 font-medium">&#10003; Enhanced!</span> Review below, edit if needed, then generate slides.';
+    isBusy = false;
 }
 
 // ── Step 1b: Generate Outline (separate button) ──
 
 async function generateOutline() {
+    if (isBusy) return;
+    isBusy = true;
     const btn = document.getElementById('btn-generate');
     btn.disabled = true;
 
@@ -316,6 +329,7 @@ async function generateOutline() {
     btn.disabled = false;
 
     if (!outline.success) {
+        isBusy = false;
         alert(outline.error || 'Failed to generate outline. Try again.');
         return;
     }
@@ -326,6 +340,8 @@ async function generateOutline() {
 
     // Render slides preview
     renderSlidesPreview(outlineData);
+
+    isBusy = false;
 
     // Auto-advance to Step 2
     goToStep(2);
@@ -440,8 +456,8 @@ function updateSlideCount() {
 // ── AI Polish per slide ──
 
 async function polishSlide(index) {
+    if (!outlineData || !outlineData.slides || !outlineData.slides[index]) return;
     const slide = outlineData.slides[index];
-    if (!slide) return;
 
     const btn = document.getElementById(`polish-btn-${index}`);
     btn.disabled = true;
@@ -515,16 +531,7 @@ function previewTemplate(primary, accent, secondary, font, name) {
     preview.style.transition = 'background 0.4s ease';
 }
 
-// Auto-preview when entering Step 3
-const origGoToStep = goToStep;
-goToStep = function(step) {
-    origGoToStep(step);
-    if (step === 3) {
-        // Trigger preview for currently selected template
-        const checked = document.querySelector('input[name="template_id"]:checked');
-        if (checked) checked.closest('label').click();
-    }
-};
+// Preview is triggered inline — goToStep handles it directly
 
 // ── Step 3: Save Presentation ──
 

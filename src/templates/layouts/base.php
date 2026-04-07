@@ -98,18 +98,22 @@
         // CSRF token for AJAX requests
         const CSRF_TOKEN = '<?= e(csrf_token()) ?>';
 
-        // Helper: make API calls
+        // Helper: make API calls with error handling
         async function api(url, data = null, method = 'POST') {
-            const opts = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': CSRF_TOKEN,
-                },
-            };
-            if (data) opts.body = JSON.stringify(data);
-            const res = await fetch(url, opts);
-            return res.json();
+            try {
+                const opts = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': CSRF_TOKEN,
+                    },
+                };
+                if (data) opts.body = JSON.stringify(data);
+                const res = await fetch(url, opts);
+                return await res.json();
+            } catch (err) {
+                return { success: false, error: 'Network error. Please check your connection and try again.' };
+            }
         }
 
         // Auto-dismiss flash messages after 5s
