@@ -73,6 +73,13 @@ class PresentationController
             $tone = 'professional';
         }
 
+        // Validate template
+        $allowed_templates = ['1', '2', '3', '4', '5'];
+        $template_id = $_POST['template_id'] ?? '1';
+        if (!in_array($template_id, $allowed_templates, true)) {
+            $template_id = '1';
+        }
+
         // Validate topic
         if ($topic === '' || mb_strlen($topic) < 3) {
             flash('error', 'Topic is required (at least 3 characters).');
@@ -98,6 +105,9 @@ class PresentationController
         $pres_id = $this->presentations->create(
             $user['id'], $title, $topic, $audience, $duration, $tone
         );
+
+        // Set template
+        $this->presentations->update($pres_id, $user['id'], ['template_id' => $template_id]);
 
         // Generate outline via AI
         $outline_service = new OutlineService();

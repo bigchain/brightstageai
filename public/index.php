@@ -54,6 +54,17 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiSlideController())->delete((int)$m[1]);
     }
 
+    // Generation API
+    if (preg_match('#^/api/generate/slides/(\d+)$#', $uri, $m) && $method === 'POST') {
+        require_once APP_ROOT . '/src/controllers/ApiGenerateController.php';
+        (new ApiGenerateController())->generate_slides((int)$m[1]);
+    }
+
+    if (preg_match('#^/api/slides/(\d+)/upload-image$#', $uri, $m) && $method === 'POST') {
+        require_once APP_ROOT . '/src/controllers/ApiGenerateController.php';
+        (new ApiGenerateController())->upload_slide_image((int)$m[1]);
+    }
+
     // Auth API
     if ($uri === '/api/auth/me' && $method === 'GET') {
         if (!is_logged_in()) {

@@ -39,6 +39,19 @@
         </div>
     </div>
 
+    <!-- Generation Progress Bar (hidden by default) -->
+    <div id="progress-bar" class="hidden mb-6">
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-2">
+                <span id="progress-message" class="text-sm font-medium text-gray-700">Generating...</span>
+                <span id="progress-percent" class="text-sm text-gray-500">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="progress-fill" class="bg-brand-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Slides -->
     <?php if (empty($slides)): ?>
     <div class="bg-white rounded-xl border border-gray-200 p-16 text-center">
@@ -46,52 +59,76 @@
         <a href="/create" class="text-brand-600 hover:text-brand-700 text-sm mt-2 inline-block">Try creating again</a>
     </div>
     <?php else: ?>
-    <div class="space-y-4" id="slides-container">
+    <div class="space-y-6" id="slides-container">
         <?php foreach ($slides as $slide): ?>
-        <div class="slide-card bg-white rounded-xl border border-gray-200 p-6" data-slide-id="<?= $slide['id'] ?>" id="slide-<?= $slide['id'] ?>">
-            <div class="flex items-start justify-between mb-4">
-                <div class="flex items-center space-x-3">
-                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-sm font-bold">
-                        <?= $slide['slide_order'] ?>
-                    </span>
-                    <span class="text-xs text-gray-400 uppercase tracking-wide"><?= e($slide['layout_type']) ?></span>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <button onclick="saveSlide(<?= $slide['id'] ?>)" class="text-xs text-brand-600 hover:text-brand-700 font-medium px-2 py-1 rounded hover:bg-brand-50 transition save-btn" data-slide-id="<?= $slide['id'] ?>" style="display:none;">
-                        Save Changes
-                    </button>
-                    <button onclick="deleteSlide(<?= $slide['id'] ?>)" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition">
-                        Remove
-                    </button>
-                </div>
+        <div class="slide-card bg-white rounded-xl border border-gray-200 overflow-hidden" data-slide-id="<?= $slide['id'] ?>" id="slide-<?= $slide['id'] ?>">
+
+            <!-- Slide Preview (shown when HTML is generated) -->
+            <?php if (!empty($slide['image_url']) || !empty($slide['html_content'])): ?>
+            <div class="bg-gray-900 p-4 flex justify-center">
+                <img id="slide-preview-<?= $slide['id'] ?>"
+                    src="<?= !empty($slide['image_url']) ? e($slide['image_url']) : '' ?>"
+                    alt="Slide <?= $slide['slide_order'] ?> preview"
+                    class="rounded shadow-lg <?= empty($slide['image_url']) ? 'hidden' : '' ?>"
+                    style="max-height: 300px; width: auto;">
+                <?php if (!empty($slide['html_content']) && empty($slide['image_url'])): ?>
+                <div class="text-gray-400 text-sm py-8">Slide designed. Click "Render Slides" to generate previews.</div>
+                <?php endif; ?>
             </div>
+            <?php endif; ?>
 
-            <!-- Title -->
-            <div class="mb-4">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Slide Title</label>
-                <input type="text" value="<?= e($slide['title']) ?>"
-                    class="slide-field w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"
-                    data-slide-id="<?= $slide['id'] ?>" data-field="title"
-                    onchange="markDirty(<?= $slide['id'] ?>)">
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <!-- Content -->
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Content (bullet points)</label>
-                    <textarea rows="5"
-                        class="slide-field w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none font-mono"
-                        data-slide-id="<?= $slide['id'] ?>" data-field="content"
-                        onchange="markDirty(<?= $slide['id'] ?>)"><?= e($slide['content']) ?></textarea>
+            <div class="p-6">
+                <!-- Slide Header -->
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-sm font-bold">
+                            <?= $slide['slide_order'] ?>
+                        </span>
+                        <span class="text-xs text-gray-400 uppercase tracking-wide"><?= e($slide['layout_type']) ?></span>
+                        <?php if (!empty($slide['html_content'])): ?>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">designed</span>
+                        <?php endif; ?>
+                        <?php if (!empty($slide['image_url'])): ?>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">rendered</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="saveSlide(<?= $slide['id'] ?>)" class="text-xs text-brand-600 hover:text-brand-700 font-medium px-2 py-1 rounded hover:bg-brand-50 transition save-btn" data-slide-id="<?= $slide['id'] ?>" style="display:none;">
+                            Save Changes
+                        </button>
+                        <button onclick="deleteSlide(<?= $slide['id'] ?>)" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition">
+                            Remove
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Speaker Notes -->
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Speaker Notes (narration script)</label>
-                    <textarea rows="5"
-                        class="slide-field w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none"
-                        data-slide-id="<?= $slide['id'] ?>" data-field="speaker_notes"
-                        onchange="markDirty(<?= $slide['id'] ?>)"><?= e($slide['speaker_notes']) ?></textarea>
+                <!-- Title -->
+                <div class="mb-4">
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Slide Title</label>
+                    <input type="text" value="<?= e($slide['title']) ?>"
+                        class="slide-field w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition"
+                        data-slide-id="<?= $slide['id'] ?>" data-field="title"
+                        onchange="markDirty(<?= $slide['id'] ?>)">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Content -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Content (bullet points)</label>
+                        <textarea rows="4"
+                            class="slide-field w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none font-mono"
+                            data-slide-id="<?= $slide['id'] ?>" data-field="content"
+                            onchange="markDirty(<?= $slide['id'] ?>)"><?= e($slide['content']) ?></textarea>
+                    </div>
+
+                    <!-- Speaker Notes -->
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Speaker Notes (narration script)</label>
+                        <textarea rows="4"
+                            class="slide-field w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition resize-none"
+                            data-slide-id="<?= $slide['id'] ?>" data-field="speaker_notes"
+                            onchange="markDirty(<?= $slide['id'] ?>)"><?= e($slide['speaker_notes']) ?></textarea>
+                    </div>
                 </div>
             </div>
         </div>
@@ -99,24 +136,57 @@
     </div>
 
     <!-- Bottom Actions -->
-    <div class="mt-8 flex items-center justify-between">
-        <div class="text-sm text-gray-500">
-            <?= count($slides) ?> slide<?= count($slides) !== 1 ? 's' : '' ?> &middot;
-            ~<?= $presentation['duration_minutes'] ?> minutes
-        </div>
-        <div class="flex items-center space-x-3">
-            <button onclick="saveAllSlides()" class="inline-flex items-center px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
-                Save All Changes
-            </button>
-            <!-- Phase 2+ buttons will go here (Generate Slides, Generate Audio, Generate Video) -->
+    <div class="mt-8 bg-white rounded-xl border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-500">
+                <?= count($slides) ?> slide<?= count($slides) !== 1 ? 's' : '' ?> &middot;
+                ~<?= $presentation['duration_minutes'] ?> minutes
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="saveAllSlides()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition">
+                    Save All Changes
+                </button>
+
+                <!-- Phase 2: Generate Slide Designs -->
+                <button onclick="generateSlideDesigns()" id="btn-generate-slides"
+                    class="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition">
+                    &#10024; Design Slides (<?= count($slides) * CREDIT_COSTS['generate_slide'] ?> credits)
+                </button>
+
+                <!-- Phase 2: Render to PNG -->
+                <?php
+                $has_html = false;
+                foreach ($slides as $s) { if (!empty($s['html_content'])) { $has_html = true; break; } }
+                ?>
+                <?php if ($has_html): ?>
+                <button onclick="renderAllSlides()" id="btn-render-slides"
+                    class="inline-flex items-center px-5 py-2.5 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 shadow-sm transition">
+                    &#127912; Render Slides to Images
+                </button>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
     <?php endif; ?>
 </div>
 
+<!-- html2canvas library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Slide Renderer -->
+<script src="/assets/js/slide-renderer.js"></script>
+
 <script>
 const PRESENTATION_ID = <?= $presentation['id'] ?>;
 const dirtySlides = new Set();
+
+// Slide data for rendering
+const SLIDES_DATA = <?= json_encode(array_map(function($s) {
+    return [
+        'id' => $s['id'],
+        'slide_order' => $s['slide_order'],
+        'html_content' => $s['html_content'] ?? null,
+    ];
+}, $slides), JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
 function markDirty(slideId) {
     dirtySlides.add(slideId);
@@ -133,11 +203,8 @@ async function saveSlide(slideId) {
         data[field.dataset.field] = field.value;
     });
 
-    const btn = card.querySelector(`.save-btn`);
-    if (btn) {
-        btn.textContent = 'Saving...';
-        btn.disabled = true;
-    }
+    const btn = card.querySelector('.save-btn');
+    if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 
     const result = await api(`/api/slides/${slideId}/update`, data);
 
@@ -145,25 +212,16 @@ async function saveSlide(slideId) {
         dirtySlides.delete(slideId);
         if (btn) {
             btn.textContent = 'Saved!';
-            setTimeout(() => {
-                btn.style.display = 'none';
-                btn.textContent = 'Save Changes';
-                btn.disabled = false;
-            }, 1500);
+            setTimeout(() => { btn.style.display = 'none'; btn.textContent = 'Save Changes'; btn.disabled = false; }, 1500);
         }
     } else {
-        alert(result.error || 'Failed to save slide');
-        if (btn) {
-            btn.textContent = 'Save Changes';
-            btn.disabled = false;
-        }
+        alert(result.error || 'Failed to save');
+        if (btn) { btn.textContent = 'Save Changes'; btn.disabled = false; }
     }
 }
 
 async function saveAllSlides() {
-    for (const slideId of dirtySlides) {
-        await saveSlide(slideId);
-    }
+    for (const slideId of dirtySlides) { await saveSlide(slideId); }
 }
 
 async function addSlide() {
@@ -174,23 +232,78 @@ async function addSlide() {
         speaker_notes: '',
         layout_type: 'bullets',
     });
-
-    if (result.success) {
-        location.reload();
-    } else {
-        alert(result.error || 'Failed to add slide');
-    }
+    if (result.success) location.reload();
+    else alert(result.error || 'Failed to add slide');
 }
 
 async function deleteSlide(slideId) {
     if (!confirm('Delete this slide?')) return;
-
     const result = await api(`/api/slides/${slideId}/delete`);
+    if (result.success) document.getElementById(`slide-${slideId}`).remove();
+    else alert(result.error || 'Failed to delete');
+}
+
+// ── Phase 2: AI Slide Design Generation ──
+
+function showProgress(message, percent) {
+    const bar = document.getElementById('progress-bar');
+    bar.classList.remove('hidden');
+    document.getElementById('progress-message').textContent = message;
+    document.getElementById('progress-percent').textContent = Math.round(percent) + '%';
+    document.getElementById('progress-fill').style.width = percent + '%';
+}
+
+function hideProgress() {
+    setTimeout(() => {
+        document.getElementById('progress-bar').classList.add('hidden');
+    }, 2000);
+}
+
+async function generateSlideDesigns() {
+    const btn = document.getElementById('btn-generate-slides');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    showProgress('Generating slide designs with AI...', 10);
+
+    const result = await api(`/api/generate/slides/${PRESENTATION_ID}`);
+
     if (result.success) {
-        document.getElementById(`slide-${slideId}`).remove();
+        showProgress(`${result.data.success_count} slides designed! Reloading...`, 100);
+        setTimeout(() => location.reload(), 1500);
     } else {
-        alert(result.error || 'Failed to delete slide');
+        alert(result.error || 'Failed to generate slides');
+        btn.disabled = false;
+        btn.innerHTML = '&#10024; Design Slides';
+        hideProgress();
     }
+}
+
+async function renderAllSlides() {
+    const btn = document.getElementById('btn-render-slides');
+    btn.disabled = true;
+    btn.textContent = 'Rendering...';
+
+    const slidesWithHtml = SLIDES_DATA.filter(s => s.html_content);
+    if (slidesWithHtml.length === 0) {
+        alert('No slides have been designed yet. Click "Design Slides" first.');
+        btn.disabled = false;
+        return;
+    }
+
+    const result = await SlideRenderer.renderAndUploadAll(
+        PRESENTATION_ID,
+        slidesWithHtml,
+        (current, total, message) => {
+            const pct = (current / total) * 100;
+            showProgress(message, pct);
+        }
+    );
+
+    showProgress(`Done! ${result.success} slides rendered, ${result.failed} failed.`, 100);
+    hideProgress();
+    btn.disabled = false;
+    btn.innerHTML = '&#127912; Render Slides to Images';
 }
 
 // Auto-save on field change
@@ -200,9 +313,6 @@ document.querySelectorAll('.slide-field').forEach(field => {
 
 // Warn before leaving with unsaved changes
 window.addEventListener('beforeunload', (e) => {
-    if (dirtySlides.size > 0) {
-        e.preventDefault();
-        e.returnValue = '';
-    }
+    if (dirtySlides.size > 0) { e.preventDefault(); e.returnValue = ''; }
 });
 </script>

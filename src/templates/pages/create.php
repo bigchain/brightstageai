@@ -74,6 +74,36 @@
             </div>
         </div>
 
+        <!-- Template -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">Design Template</label>
+            <div class="grid grid-cols-5 gap-3">
+                <?php
+                $templates = [
+                    ['1', 'Corporate', '#1e3a5f', '#3498db', '#ffffff'],
+                    ['2', 'Creative', '#ff6b6b', '#6c5ce7', '#ffeaa7'],
+                    ['3', 'Minimal', '#2d3436', '#00b894', '#ffffff'],
+                    ['4', 'Dark', '#0a0a0a', '#e94560', '#e0e0e0'],
+                    ['5', 'Vibrant', '#667eea', '#f093fb', '#ffffff'],
+                ];
+                foreach ($templates as [$tid, $tname, $tprimary, $taccent, $tsecondary]):
+                ?>
+                <label class="cursor-pointer">
+                    <input type="radio" name="template_id" value="<?= $tid ?>" class="sr-only peer" <?= $tid === '1' ? 'checked' : '' ?>>
+                    <div class="rounded-lg border-2 border-gray-200 peer-checked:border-brand-500 peer-checked:ring-2 peer-checked:ring-brand-200 p-3 transition hover:border-gray-300">
+                        <div class="h-16 rounded-md mb-2" style="background: linear-gradient(135deg, <?= $tprimary ?>, <?= $taccent ?>);">
+                            <div class="p-2">
+                                <div class="h-1.5 w-12 rounded-full mb-1" style="background: <?= $tsecondary ?>; opacity: 0.9"></div>
+                                <div class="h-1 w-8 rounded-full" style="background: <?= $tsecondary ?>; opacity: 0.5"></div>
+                            </div>
+                        </div>
+                        <p class="text-xs font-medium text-center text-gray-700"><?= $tname ?></p>
+                    </div>
+                </label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
         <!-- Submit -->
         <div class="pt-4">
             <button type="submit" id="submit-btn"
