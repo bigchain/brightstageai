@@ -89,7 +89,7 @@ class TTSService
             'model'      => $this->model,
             'stream'     => true,
             'modalities' => ['text', 'audio'],
-            'audio'      => ['voice' => $voice, 'format' => 'mp3'],
+            'audio'      => ['voice' => $voice, 'format' => 'pcm16'],
             'messages'   => [
                 ['role' => 'system', 'content' => 'Read the following text aloud exactly as written. Natural pace, clear pronunciation. No extra words or commentary.'],
                 ['role' => 'user', 'content' => $text],
@@ -154,13 +154,50 @@ class TTSService
             return null;
         }
 
-        $decoded = base64_decode($audio_b64);
-        if ($decoded === false || strlen($decoded) < 100) {
+        $pcm_data = base64_decode($audio_b64);
+        if ($pcm_data === false || strlen($pcm_data) < 100) {
             error_log('BrightStage TTS: base64 decode failed. Length: ' . strlen($audio_b64));
             return null;
         }
 
-        return $decoded;
+        // Convert PCM16 to MP3 using FFmpeg
+        return $this->pcm16_to_mp3($pcm_data);
+    }
+
+    /**
+     * Convert raw PCM16 audio to MP3 using FFmpeg.
+     * PCM16 from OpenRouter: 24000Hz, mono, signed 16-bit little-endian.
+     */
+    private function pcm16_to_mp3(string $pcm_data): ?string
+    {
+        $ffmpeg = trim(shell_exec('which ffmpeg 2>/dev/null') ?? '');
+        if ($ffmpeg === '') $ffmpeg = '/usr/bin/ffmpeg';
+
+        $pcm_file = tempnam(sys_get_temp_dir(), 'pcm_');
+        $mp3_file = tempnam(sys_get_temp_dir(), 'mp3_') . '.mp3';
+
+        file_put_contents($pcm_file, $pcm_data);
+
+        $cmd = sprintf(
+            '%s -y -f s16le -ar 24000 -ac 1 -i %s -codec:a libmp3lame -b:a 128k %s 2>&1',
+            escapeshellarg($ffmpeg),
+            escapeshellarg($pcm_file),
+            escapeshellarg($mp3_file)
+        );
+
+        shell_exec($cmd);
+        unlink($pcm_file);
+
+        if (!file_exists($mp3_file) || filesize($mp3_file) < 100) {
+            error_log('BrightStage TTS: FFmpeg PCM→MP3 conversion failed');
+            if (file_exists($mp3_file)) unlink($mp3_file);
+            return null;
+        }
+
+        $mp3_data = file_get_contents($mp3_file);
+        unlink($mp3_file);
+
+        return $mp3_data;
     }
 
     private function split_text(string $text, int $max_chars): array
