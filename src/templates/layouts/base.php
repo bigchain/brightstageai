@@ -39,7 +39,7 @@
                     <a href="/create" class="text-sm text-gray-600 hover:text-brand-600">+ New</a>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-brand-100 text-brand-800">
+                    <span id="nav-credits-badge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-brand-100 text-brand-800">
                         <?= e(current_user()['credits_balance'] ?? 0) ?> credits
                     </span>
                     <span class="text-sm text-gray-500"><?= e(current_user()['name'] ?? '') ?></span>

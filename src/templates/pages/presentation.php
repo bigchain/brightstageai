@@ -158,14 +158,37 @@
 
         <!-- Step-by-step pipeline -->
         <div class="bg-white rounded-xl border border-gray-200 p-6">
-            <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Pipeline</p>
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Pipeline</p>
+                <div class="flex items-center space-x-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-brand-100 text-brand-700" id="credits-display">
+                        <?= e(current_user()['credits_balance']) ?> credits
+                    </span>
+                </div>
+            </div>
+
+            <!-- Pipeline progress tracker (hidden until action starts) -->
+            <div id="pipeline-progress" class="hidden mb-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span id="pipeline-step-label" class="text-sm font-medium text-gray-700"></span>
+                    <span id="pipeline-percent" class="text-sm font-semibold text-brand-600"></span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                    <div id="pipeline-bar" class="h-2.5 rounded-full transition-all duration-300 bg-brand-600" style="width: 0%"></div>
+                </div>
+                <div class="flex items-center justify-between mt-1.5">
+                    <span id="pipeline-detail" class="text-xs text-gray-400"></span>
+                    <span id="pipeline-credits-used" class="text-xs text-amber-600 font-medium"></span>
+                </div>
+            </div>
+
             <div class="grid grid-cols-<?= $has_html ? ($has_images ? '4' : '3') : '2' ?> gap-3">
 
                 <!-- Step 1: Design -->
                 <button onclick="generateSlideDesigns()" id="btn-generate-slides"
-                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_html ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50 ring-2 ring-purple-200' ?> transition hover:shadow-sm text-center">
-                    <span class="text-2xl mb-2"><?= $has_html ? '&#10003;' : '&#10024;' ?></span>
-                    <span class="text-xs font-semibold <?= $has_html ? 'text-green-700' : 'text-purple-700' ?>">
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_html ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50 ring-2 ring-purple-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
+                    <span class="text-2xl mb-2" id="icon-design"><?= $has_html ? '&#10003;' : '&#10024;' ?></span>
+                    <span class="text-xs font-semibold <?= $has_html ? 'text-green-700' : 'text-purple-700' ?>" id="label-design">
                         <?= $has_html ? 'Redesign Slides' : 'Design Slides' ?>
                     </span>
                     <span class="text-xs text-gray-400 mt-1"><?= count($slides) * CREDIT_COSTS['generate_slide'] ?> credits</span>
@@ -174,23 +197,23 @@
                 <!-- Step 2: Render -->
                 <?php if ($has_html): ?>
                 <button onclick="renderAllSlides()" id="btn-render-slides"
-                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_images ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50 ring-2 ring-blue-200' ?> transition hover:shadow-sm text-center">
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_images ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50 ring-2 ring-blue-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
                     <span class="text-2xl mb-2"><?= $has_images ? '&#10003;' : '&#127912;' ?></span>
                     <span class="text-xs font-semibold <?= $has_images ? 'text-green-700' : 'text-blue-700' ?>">Render Previews</span>
                     <span class="text-xs text-gray-400 mt-1">Free</span>
                 </button>
                 <?php endif; ?>
 
-                <!-- Step 3: Audio (Phase 3 — coming soon) -->
-                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-50">
+                <!-- Step 3: Audio -->
+                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
                     <span class="text-2xl mb-2">&#127908;</span>
                     <span class="text-xs font-semibold text-gray-400">Generate Audio</span>
                     <span class="text-xs text-gray-300 mt-1">Coming soon</span>
                 </div>
 
-                <!-- Step 4: Video (Phase 3 — coming soon) -->
+                <!-- Step 4: Video -->
                 <?php if ($has_html): ?>
-                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-50">
+                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
                     <span class="text-2xl mb-2">&#127916;</span>
                     <span class="text-xs font-semibold text-gray-400">Generate Video</span>
                     <span class="text-xs text-gray-300 mt-1">Coming soon</span>
@@ -282,8 +305,41 @@ function deleteSlide(slideId) {
     });
 }
 
-// ── Phase 2: AI Slide Design Generation ──
+// ── Pipeline Progress System ──
 
+const SLIDE_COUNT = SLIDES_DATA.length;
+const CREDIT_PER_SLIDE = <?= CREDIT_COSTS['generate_slide'] ?>;
+
+function showPipelineProgress(step, detail, percent, creditsUsed = 0) {
+    const el = document.getElementById('pipeline-progress');
+    el.classList.remove('hidden');
+    document.getElementById('pipeline-step-label').textContent = step;
+    document.getElementById('pipeline-percent').textContent = Math.round(percent) + '%';
+    document.getElementById('pipeline-bar').style.width = percent + '%';
+    document.getElementById('pipeline-detail').textContent = detail;
+    if (creditsUsed > 0) {
+        document.getElementById('pipeline-credits-used').textContent = `${creditsUsed} credits used`;
+    } else {
+        document.getElementById('pipeline-credits-used').textContent = '';
+    }
+}
+
+function hidePipelineProgress() {
+    setTimeout(() => {
+        document.getElementById('pipeline-progress').classList.add('hidden');
+    }, 3000);
+}
+
+function updateCreditsDisplay(newBalance) {
+    if (newBalance === undefined) return;
+    const label = newBalance + ' credits';
+    const el = document.getElementById('credits-display');
+    const nav = document.getElementById('nav-credits-badge');
+    if (el) el.textContent = label;
+    if (nav) nav.textContent = label;
+}
+
+// Old progress bar (top of page) — keep for backward compat
 function showProgress(message, percent) {
     const bar = document.getElementById('progress-bar');
     bar.classList.remove('hidden');
@@ -291,37 +347,62 @@ function showProgress(message, percent) {
     document.getElementById('progress-percent').textContent = Math.round(percent) + '%';
     document.getElementById('progress-fill').style.width = percent + '%';
 }
-
 function hideProgress() {
-    setTimeout(() => {
-        document.getElementById('progress-bar').classList.add('hidden');
-    }, 2000);
+    setTimeout(() => document.getElementById('progress-bar').classList.add('hidden'), 2000);
 }
+
+// ── Phase 2: AI Slide Design Generation ──
 
 async function generateSlideDesigns() {
     const btn = document.getElementById('btn-generate-slides');
     btn.disabled = true;
-    btn.textContent = 'Generating...';
 
-    showProgress('Generating slide designs with AI...', 10);
+    const totalCredits = SLIDE_COUNT * CREDIT_PER_SLIDE;
+    showPipelineProgress('Designing slides with AI...', `0 of ${SLIDE_COUNT} slides`, 5, 0);
+
+    // Simulate per-slide progress (API does all at once, but we show incremental)
+    let fakeProgress = 5;
+    const progressInterval = setInterval(() => {
+        if (fakeProgress < 85) {
+            fakeProgress += Math.random() * 8;
+            const done = Math.min(SLIDE_COUNT, Math.floor((fakeProgress / 85) * SLIDE_COUNT));
+            showPipelineProgress(
+                'Designing slides with AI...',
+                `${done} of ${SLIDE_COUNT} slides designed`,
+                fakeProgress,
+                done * CREDIT_PER_SLIDE
+            );
+        }
+    }, 2000);
 
     const result = await api(`/api/generate/slides/${PRESENTATION_ID}`);
+    clearInterval(progressInterval);
 
     if (result.success) {
-        showProgress(`${result.data.success_count} slides designed! Reloading...`, 100);
-        setTimeout(() => location.reload(), 1500);
+        const used = result.data.credits_used || totalCredits;
+        showPipelineProgress(
+            'Design complete!',
+            `${result.data.success_count} of ${SLIDE_COUNT} slides designed`,
+            100,
+            used
+        );
+        toast(`${result.data.success_count} slides designed! ${used} credits used.`, 'success', 3000);
+
+        // Refresh credits in nav
+        const me = await api('/api/auth/me', null, 'GET');
+        if (me.success) updateCreditsDisplay(me.data.credits_balance);
+
+        setTimeout(() => location.reload(), 2000);
     } else {
         toast(result.error || 'Failed to generate slides', 'error');
         btn.disabled = false;
-        btn.innerHTML = '&#10024; Design Slides';
-        hideProgress();
+        hidePipelineProgress();
     }
 }
 
 async function renderAllSlides() {
     const btn = document.getElementById('btn-render-slides');
     btn.disabled = true;
-    btn.textContent = 'Rendering...';
 
     const slidesWithHtml = SLIDES_DATA.filter(s => s.html_content);
     if (slidesWithHtml.length === 0) {
@@ -330,19 +411,35 @@ async function renderAllSlides() {
         return;
     }
 
+    const total = slidesWithHtml.length;
+
     const result = await SlideRenderer.renderAndUploadAll(
         PRESENTATION_ID,
         slidesWithHtml,
-        (current, total, message) => {
-            const pct = (current / total) * 100;
-            showProgress(message, pct);
+        (current, tot, message) => {
+            const pct = (current / tot) * 100;
+            showPipelineProgress(
+                'Rendering slide images...',
+                `${current} of ${tot} slides`,
+                pct,
+                0
+            );
         }
     );
 
-    showProgress(`Done! ${result.success} slides rendered, ${result.failed} failed.`, 100);
-    hideProgress();
+    showPipelineProgress(
+        'Rendering complete!',
+        `${result.success} rendered, ${result.failed} failed`,
+        100,
+        0
+    );
+    toast(`${result.success} slides rendered to images.`, 'success');
+    hidePipelineProgress();
     btn.disabled = false;
-    btn.innerHTML = '&#127912; Render Slides to Images';
+
+    if (result.success > 0) {
+        setTimeout(() => location.reload(), 1500);
+    }
 }
 
 // Auto-save on field change
