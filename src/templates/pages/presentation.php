@@ -90,27 +90,35 @@
                         <?= $slide['html_content'] ?>
                     </div>
                 </div>
-                <!-- Overlay actions -->
-                <div class="absolute bottom-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <button onclick="toggleSlideEdit(<?= $slide['id'] ?>)" id="edit-toggle-<?= $slide['id'] ?>"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-700 hover:bg-gray-800 shadow-lg transition">
-                        &#9998; Edit Text
-                    </button>
-                    <button onclick="document.getElementById('slide-upload-<?= $slide['id'] ?>').click()"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-700 hover:bg-gray-800 shadow-lg transition">
-                        &#128228; Replace Image
-                    </button>
-                    <button onclick="regenerateSlideDesign(<?= $slide['id'] ?>)"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 shadow-lg transition">
-                        &#10024; Regenerate
-                    </button>
-                    <button onclick="regenerateWithPrompt(<?= $slide['id'] ?>)"
-                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 shadow-lg transition">
-                        &#10024; AI Edit
-                    </button>
+                <!-- Overlay: Bottom action bar -->
+                <div class="absolute bottom-0 left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-gradient-to-t from-black/70 to-transparent pt-10 pb-3 px-3">
+                    <div class="flex items-center justify-center space-x-2">
+                        <button onclick="toggleSlideEdit(<?= $slide['id'] ?>)" id="edit-toggle-<?= $slide['id'] ?>"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/20 hover:bg-white/30 backdrop-blur shadow transition">
+                            &#9998; Edit Text
+                        </button>
+                        <button onclick="showBgUpload(<?= $slide['id'] ?>)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/20 hover:bg-white/30 backdrop-blur shadow transition">
+                            &#127912; Background
+                        </button>
+                        <button onclick="changeSlideLayout(<?= $slide['id'] ?>, '<?= e($slide['layout_type']) ?>')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/20 hover:bg-white/30 backdrop-blur shadow transition">
+                            &#9638; Layout
+                        </button>
+                        <button onclick="regenerateSlideDesign(<?= $slide['id'] ?>)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600/80 hover:bg-purple-600 backdrop-blur shadow transition">
+                            &#10024; Regenerate
+                        </button>
+                        <button onclick="regenerateWithPrompt(<?= $slide['id'] ?>)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-600/80 hover:bg-brand-600 backdrop-blur shadow transition">
+                            &#10024; AI Edit
+                        </button>
+                    </div>
                 </div>
-                <!-- Per-slide upload (replace this slide's image) -->
-                <input type="file" id="slide-upload-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
+                <!-- Hidden file inputs -->
+                <input type="file" id="bg-upload-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
+                    onchange="uploadBackground(<?= $slide['id'] ?>, this.files[0])">
+                <input type="file" id="slide-replace-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
                     onchange="uploadSingleSlide(<?= $slide['id'] ?>, this.files[0])">
 
                 <!-- Save bar (shown during manual edit) -->
@@ -700,46 +708,162 @@ function initDragReorder() {
 // Init on page load
 document.addEventListener('DOMContentLoaded', initDragReorder);
 
-// ── Upload/Replace Single Slide Image ──
+// ── Background Upload (keeps text, changes BG) ──
 
-async function uploadSingleSlide(slideId, file) {
+function showBgUpload(slideId) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 w-full" style="animation:fadeInUp 0.2s ease;">
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Change Slide Background</h3>
+            <p class="text-sm text-gray-500 mb-4">Upload an image or set a background color. Text stays the same.</p>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Upload Background Image</label>
+                    <button onclick="document.getElementById('bg-upload-${slideId}').click(); this.closest('[style]').remove();"
+                        class="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600 transition">
+                        Choose Image (PNG, JPG, WebP)
+                    </button>
+                </div>
+                <div class="text-center text-xs text-gray-400">— or —</div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">Set Background Color</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="color" id="bg-color-${slideId}" value="#1e3a5f" class="w-10 h-10 rounded border cursor-pointer">
+                        <button onclick="applyBgColor(${slideId}); this.closest('[style]').remove();"
+                            class="flex-1 py-2.5 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 transition">Apply Color</button>
+                    </div>
+                </div>
+                <div>
+                    <button onclick="regenerateWithPrompt(${slideId}); this.closest('[style]').remove();"
+                        class="w-full py-2.5 rounded-lg text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 transition">
+                        &#10024; Or describe the background you want (AI)
+                    </button>
+                </div>
+            </div>
+            <button onclick="this.closest('[style]').remove()" class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function uploadBackground(slideId, file) {
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast('Image must be under 10MB', 'warning'); return; }
 
-    // Validate
-    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-        toast('Please upload a PNG, JPG, or WebP image', 'warning');
-        return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-        toast('Image must be under 10MB', 'warning');
-        return;
-    }
+    toast('Applying background...', 'info', 2000);
 
-    toast('Uploading slide image...', 'info', 2000);
-
-    // Convert to base64 and upload
     const reader = new FileReader();
     reader.onload = async function(e) {
-        const result = await api(`/api/slides/${slideId}/upload-image`, {
-            image_data: e.target.result,
+        const preview = document.getElementById(`live-preview-${slideId}`);
+        if (!preview) return;
+
+        // Find the outermost div in the slide HTML and set its background-image
+        const slideRoot = preview.firstElementChild;
+        if (slideRoot) {
+            slideRoot.style.backgroundImage = `url(${e.target.result})`;
+            slideRoot.style.backgroundSize = 'cover';
+            slideRoot.style.backgroundPosition = 'center';
+        }
+
+        // Save modified HTML
+        const result = await api(`/api/slides/${slideId}/update`, {
+            html_content: preview.innerHTML,
+            image_url: '',
         });
 
         if (result.success) {
-            // Update the preview with the uploaded image
-            const wrapper = document.querySelector(`#slide-${slideId} .slide-preview-wrapper`);
-            if (wrapper) {
-                wrapper.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;">`;
-            }
-            toast('Slide image replaced!', 'success');
+            toast('Background updated! Text preserved.', 'success');
         } else {
-            toast(result.error || 'Upload failed', 'error');
+            toast(result.error || 'Failed to save', 'error');
         }
     };
     reader.readAsDataURL(file);
+    document.getElementById(`bg-upload-${slideId}`).value = '';
+}
 
-    // Reset file input
-    document.getElementById(`slide-upload-${slideId}`).value = '';
+function applyBgColor(slideId) {
+    const color = document.getElementById(`bg-color-${slideId}`).value;
+    const preview = document.getElementById(`live-preview-${slideId}`);
+    if (!preview) return;
+
+    const slideRoot = preview.firstElementChild;
+    if (slideRoot) {
+        slideRoot.style.background = color;
+        slideRoot.style.backgroundImage = 'none';
+    }
+
+    // Save
+    api(`/api/slides/${slideId}/update`, {
+        html_content: preview.innerHTML,
+        image_url: '',
+    }).then(result => {
+        if (result.success) toast('Background color applied!', 'success');
+        else toast(result.error || 'Failed to save', 'error');
+    });
+}
+
+// ── Change Layout Type ──
+
+function changeSlideLayout(slideId, currentLayout) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+    const layouts = [
+        { id: 'title', name: 'Title Slide', desc: 'Big centered title with subtitle' },
+        { id: 'bullets', name: 'Bullets', desc: 'Title + bullet points' },
+        { id: 'quote', name: 'Quote', desc: 'Featured quote or key insight' },
+        { id: 'image_left', name: 'Image Left', desc: 'Visual on left, text on right' },
+        { id: 'image_right', name: 'Image Right', desc: 'Text on left, visual on right' },
+        { id: 'two_column', name: 'Two Column', desc: 'Side-by-side comparison' },
+    ];
+
+    const layoutHtml = layouts.map(l => `
+        <button onclick="applyLayout(${slideId}, '${l.id}'); this.closest('[style]').remove();"
+            class="flex items-center p-3 rounded-lg border ${l.id === currentLayout ? 'border-brand-500 bg-brand-50' : 'border-gray-200 hover:border-brand-300 hover:bg-gray-50'} transition text-left w-full">
+            <div>
+                <div class="text-sm font-medium text-gray-900">${l.name}</div>
+                <div class="text-xs text-gray-500">${l.desc}</div>
+            </div>
+            ${l.id === currentLayout ? '<span class="ml-auto text-brand-600 text-xs font-medium">Current</span>' : ''}
+        </button>
+    `).join('');
+
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm mx-4 w-full" style="animation:fadeInUp 0.2s ease;">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Change Layout</h3>
+            <div class="space-y-2">${layoutHtml}</div>
+            <p class="text-xs text-gray-400 mt-4 text-center">Changing layout will regenerate this slide's design (${CREDIT_PER_SLIDE} credits)</p>
+            <button onclick="this.closest('[style]').remove()" class="mt-3 w-full py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function applyLayout(slideId, layout) {
+    // Update layout in DB first
+    await api(`/api/slides/${slideId}/update`, { layout_type: layout });
+    // Then regenerate design with new layout
+    toast(`Switching to ${layout} layout...`, 'info', 2000);
+    await regenerateSlideDesign(slideId);
+}
+
+// ── Replace Entire Slide (nuclear option — from header Upload button) ──
+
+async function uploadSingleSlide(slideId, file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast('Max 10MB', 'warning'); return; }
+
+    toast('Replacing slide...', 'info', 2000);
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const result = await api(`/api/slides/${slideId}/upload-image`, { image_data: e.target.result });
+        if (result.success) { toast('Slide replaced!', 'success'); location.reload(); }
+        else toast(result.error || 'Failed', 'error');
+    };
+    reader.readAsDataURL(file);
 }
 
 // ── Inline Slide Editing (WYSIWYG) ──
