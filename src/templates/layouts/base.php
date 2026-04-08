@@ -25,6 +25,9 @@
         /* Live slide preview — scales 1920x1080 to fit card */
         .slide-live-preview { border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
         .slide-live-preview * { max-width: none !important; }
+        /* Drag reorder */
+        .slide-card.border-t-4 { border-top: 4px solid #3b82f6 !important; }
+        .drag-handle:hover { color: #3b82f6 !important; }
         .slide-card { transition: all 0.2s ease; }
         .slide-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
     </style>

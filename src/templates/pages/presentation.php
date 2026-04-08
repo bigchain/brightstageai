@@ -22,15 +22,34 @@
                 </span>
             </div>
             <h1 class="text-2xl font-bold text-gray-900"><?= e($presentation['title']) ?></h1>
-            <p class="text-gray-500 text-sm mt-1">
-                <?= e($presentation['audience']) ?> &middot; <?= $presentation['duration_minutes'] ?> min &middot; <?= ucfirst(e($presentation['tone'])) ?>
-            </p>
+            <div class="flex items-center space-x-3 mt-1">
+                <p class="text-gray-500 text-sm">
+                    <?= e($presentation['audience']) ?> &middot; <?= $presentation['duration_minutes'] ?> min &middot; <?= ucfirst(e($presentation['tone'])) ?>
+                </p>
+                <!-- Template Switcher -->
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-xs text-gray-400">Template:</span>
+                    <select id="template-switcher" onchange="switchTemplate(this.value)"
+                        class="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 cursor-pointer hover:border-brand-400 transition">
+                        <?php
+                        $tpl_stmt = get_db()->prepare('SELECT id, name FROM templates WHERE is_active = 1 ORDER BY sort_order');
+                        $tpl_stmt->execute();
+                        $all_templates = $tpl_stmt->fetchAll();
+                        foreach ($all_templates as $tpl):
+                        ?>
+                        <option value="<?= $tpl['id'] ?>" <?= $tpl['id'] == $presentation['template_id'] ? 'selected' : '' ?>>
+                            <?= e($tpl['name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
         </div>
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 flex-wrap gap-y-2">
             <button onclick="addSlide()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">+ Add Slide</button>
             <button onclick="openSlideshow()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#9654; Preview</button>
             <button onclick="downloadPDF()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#128196; PDF</button>
-            <button onclick="document.getElementById('upload-slides-input').click()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#128228; Upload Slides</button>
+            <button onclick="document.getElementById('upload-slides-input').click()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition">&#128228; Upload</button>
             <button onclick="duplicatePresentation()" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-500 bg-white hover:bg-gray-50 transition">Duplicate</button>
             <button onclick="deletePresentation()" class="inline-flex items-center px-3 py-2 border border-red-200 rounded-lg text-xs font-medium text-red-500 bg-white hover:bg-red-50 transition">Delete</button>
             <input type="file" id="upload-slides-input" accept="image/png,image/jpeg,image/webp" multiple class="hidden" onchange="uploadSlides(this.files)">
@@ -522,6 +541,127 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 // ── Project Management ──
+
+// ── Template Switcher ──
+
+async function switchTemplate(templateId) {
+    // Save template choice
+    const saveResult = await api(`/api/presentations/${PRESENTATION_ID}`, { template_id: templateId });
+    if (!saveResult.success) {
+        toast('Failed to save template', 'error');
+        return;
+    }
+
+    // Ask if they want to redesign all slides with new template
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4" style="animation:fadeInUp 0.2s ease;">
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Template Changed</h3>
+            <p class="text-sm text-gray-500 mb-6">Do you want to redesign all slides with the new template? This costs ${SLIDE_COUNT * CREDIT_PER_SLIDE} credits.</p>
+            <div class="flex justify-end space-x-3">
+                <button onclick="this.closest('[style]').remove(); toast('Template saved. Slides keep current design.', 'info')"
+                    class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Keep Current Designs</button>
+                <button onclick="this.closest('[style]').remove(); generateSlideDesigns()"
+                    class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition">
+                    &#10024; Redesign All Slides
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+// ── Drag to Reorder Slides ──
+
+let draggedSlide = null;
+
+function initDragReorder() {
+    const container = document.getElementById('slides-container');
+    if (!container) return;
+
+    container.querySelectorAll('.slide-card').forEach(card => {
+        // Add drag handle
+        const header = card.querySelector('.flex.items-start');
+        if (!header) return;
+
+        const handle = document.createElement('div');
+        handle.className = 'drag-handle cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 mr-2 select-none';
+        handle.innerHTML = '&#8942;&#8942;';
+        handle.style.cssText = 'font-size:16px;line-height:1;letter-spacing:2px;padding:4px;';
+        handle.draggable = true;
+        header.insertBefore(handle, header.firstChild);
+
+        card.addEventListener('dragstart', (e) => {
+            draggedSlide = card;
+            card.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        card.addEventListener('dragend', () => {
+            draggedSlide = null;
+            card.style.opacity = '1';
+            container.querySelectorAll('.slide-card').forEach(c => c.classList.remove('border-t-4', 'border-brand-400'));
+        });
+
+        card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            card.classList.add('border-t-4', 'border-brand-400');
+        });
+
+        card.addEventListener('dragleave', () => {
+            card.classList.remove('border-t-4', 'border-brand-400');
+        });
+
+        card.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            card.classList.remove('border-t-4', 'border-brand-400');
+
+            if (!draggedSlide || draggedSlide === card) return;
+
+            // Move in DOM
+            container.insertBefore(draggedSlide, card);
+
+            // Collect new order
+            const slideIds = Array.from(container.querySelectorAll('.slide-card'))
+                .map(c => parseInt(c.dataset.slideId));
+
+            // Update slide numbers visually
+            container.querySelectorAll('.slide-card').forEach((c, i) => {
+                const numBadge = c.querySelector('.rounded-full.bg-brand-100');
+                if (numBadge) numBadge.textContent = i + 1;
+            });
+
+            // Save to server
+            const result = await api('/api/slides/reorder', {
+                presentation_id: PRESENTATION_ID,
+                slide_ids: slideIds,
+            });
+
+            if (result.success) {
+                toast('Slides reordered', 'success', 2000);
+            } else {
+                toast('Failed to save order', 'error');
+                location.reload();
+            }
+        });
+
+        // Make the card draggable via handle only
+        handle.addEventListener('dragstart', (e) => {
+            e.stopPropagation();
+            draggedSlide = card;
+            card.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        card.draggable = false; // Only handle triggers drag
+        handle.draggable = true;
+    });
+}
+
+// Init on page load
+document.addEventListener('DOMContentLoaded', initDragReorder);
 
 // ── Gamma-style: Regenerate individual slide design ──
 
