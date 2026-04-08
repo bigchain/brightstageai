@@ -66,8 +66,7 @@ class OpenRouterService
         $parsed = json_decode($raw, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            // Log error type only — never log raw AI response (may contain user data)
-            error_log('BrightStage OpenRouter: JSON parse error - ' . json_last_error_msg());
+            error_log('BrightStage OpenRouter: JSON parse error - ' . json_last_error_msg() . ' | First 200 chars: ' . substr($raw, 0, 200));
             return null;
         }
 
@@ -107,11 +106,16 @@ class OpenRouterService
         }
 
         if ($http_code >= 400) {
-            // Log HTTP code only — response body may contain sensitive info
-            error_log("BrightStage OpenRouter: API error HTTP {$http_code}");
+            error_log("BrightStage OpenRouter: API error HTTP {$http_code} | " . substr($body, 0, 300));
             return null;
         }
 
-        return json_decode($body, true);
+        $decoded = json_decode($body, true);
+        if ($decoded === null && $body !== '') {
+            error_log("BrightStage OpenRouter: Response not JSON | HTTP {$http_code} | " . substr($body, 0, 300));
+            return null;
+        }
+
+        return $decoded;
     }
 }
