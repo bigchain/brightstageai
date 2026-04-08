@@ -137,7 +137,7 @@ class TTSService
         curl_close($ch);
 
         if ($error || $http_code >= 400) {
-            error_log("BrightStage TTS non-streaming: HTTP {$http_code}");
+            error_log("BrightStage TTS non-streaming: HTTP {$http_code} body: " . substr($body, 0, 500));
             return null;
         }
 
@@ -212,6 +212,8 @@ class TTSService
         $error = curl_error($ch);
         curl_close($ch);
 
+        // For streaming, we need to capture the body differently since WRITEFUNCTION was used
+        $stream_body = '';
         if ($error || $http_code >= 400) {
             error_log("BrightStage TTS streaming: HTTP {$http_code}");
             return null;
