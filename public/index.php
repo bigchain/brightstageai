@@ -65,6 +65,140 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiGenerateController())->upload_slide_image((int)$m[1]);
     }
 
+    // Generate TTS audio for all slides
+    if (preg_match('#^/api/generate/audio/(\d+)$#', $uri, $m) && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $pres_id = (int)$m[1];
+        $user = current_user();
+
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/SlideModel.php';
+        require_once APP_ROOT . '/src/models/UserModel.php';
+        require_once APP_ROOT . '/src/services/TTSService.php';
+
+        $presentations = new PresentationModel();
+        $slideModel = new SlideModel();
+        $users = new UserModel();
+
+        $pres = $presentations->find_by_id($pres_id, $user['id']);
+        if (!$pres) json_error('Not found', 404);
+
+        $slides = $slideModel->list_by_presentation($pres_id);
+        if (empty($slides)) json_error('No slides');
+
+        $tts = new TTSService();
+        if (!$tts->is_available()) {
+            json_error('TTS not configured. Add OPENAI_API_KEY or ELEVENLABS_API_KEY to .env');
+        }
+
+        // Check credits
+        $cost = count($slides) * CREDIT_COSTS['generate_audio'];
+        $balance = $users->get_credits($user['id']);
+        if ($balance < $cost) json_error("Not enough credits. Need {$cost}, have {$balance}.");
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $voice = $input['voice'] ?? 'alloy';
+        $allowed_voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+        if (!in_array($voice, $allowed_voices, true)) $voice = 'alloy';
+
+        // Generate audio
+        $results = $tts->generate_for_slides($slides, $user['id'], $pres_id, $voice);
+
+        // Update slide records and count successes
+        $success_count = 0;
+        foreach ($results as $r) {
+            if ($r['success']) {
+                $slideModel->update($r['slide_id'], ['audio_url' => $r['audio_url']]);
+                $success_count++;
+            }
+        }
+
+        if ($success_count === 0) json_error('Failed to generate any audio. Check TTS configuration.');
+
+        // Deduct credits
+        $actual_cost = $success_count * CREDIT_COSTS['generate_audio'];
+        $users->deduct_credits($user['id'], $actual_cost, 'generate_audio', $pres_id);
+
+        $presentations->update_status($pres_id, 'audio_ready');
+
+        json_success([
+            'success_count' => $success_count,
+            'total'         => count($slides),
+            'credits_used'  => $actual_cost,
+        ]);
+    }
+
+    // Queue video generation
+    if (preg_match('#^/api/generate/video/(\d+)$#', $uri, $m) && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $pres_id = (int)$m[1];
+        $user = current_user();
+
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/UserModel.php';
+
+        $presentations = new PresentationModel();
+        $users = new UserModel();
+
+        $pres = $presentations->find_by_id($pres_id, $user['id']);
+        if (!$pres) json_error('Not found', 404);
+
+        // Check credits
+        $cost = CREDIT_COSTS['assemble_video'];
+        $balance = $users->get_credits($user['id']);
+        if ($balance < $cost) json_error("Not enough credits. Need {$cost}, have {$balance}.");
+
+        // Deduct credits
+        if (!$users->deduct_credits($user['id'], $cost, 'assemble_video', $pres_id)) {
+            json_error('Credit deduction failed');
+        }
+
+        // Create video job
+        $db = get_db();
+        $stmt = $db->prepare(
+            'INSERT INTO videos (presentation_id, status, progress_message, created_at, updated_at)
+             VALUES (?, "queued", "Queued for processing...", NOW(), NOW())'
+        );
+        $stmt->execute([$pres_id]);
+        $video_id = (int)$db->lastInsertId();
+
+        json_success([
+            'video_id'     => $video_id,
+            'credits_used' => $cost,
+            'message'      => 'Video queued! Processing will start shortly.',
+        ]);
+    }
+
+    // Poll video status
+    if (preg_match('#^/api/videos/(\d+)/status$#', $uri, $m) && $method === 'GET') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+
+        $video_id = (int)$m[1];
+        $db = get_db();
+
+        $stmt = $db->prepare(
+            'SELECT v.*, p.user_id FROM videos v
+             JOIN presentations p ON p.id = v.presentation_id
+             WHERE v.id = ? AND p.user_id = ?'
+        );
+        $stmt->execute([$video_id, current_user()['id']]);
+        $video = $stmt->fetch();
+
+        if (!$video) json_error('Not found', 404);
+
+        json_success([
+            'status'           => $video['status'],
+            'progress_message' => $video['progress_message'],
+            'file_url'         => $video['file_url'],
+            'duration_seconds' => $video['duration_seconds'],
+            'file_size_bytes'  => $video['file_size_bytes'],
+        ]);
+    }
+
     // Upload custom slide image (file upload, not base64)
     if (preg_match('#^/api/presentations/(\d+)/upload-slides$#', $uri, $m) && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);

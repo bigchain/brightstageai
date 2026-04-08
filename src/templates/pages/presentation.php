@@ -138,10 +138,18 @@
     <?php
     $has_html = false;
     $has_images = false;
+    $has_audio = false;
     foreach ($slides as $s) {
         if (!empty($s['html_content'])) $has_html = true;
         if (!empty($s['image_url'])) $has_images = true;
+        if (!empty($s['audio_url'])) $has_audio = true;
     }
+    // Check for existing video
+    $video = null;
+    $video_stmt = get_db()->prepare('SELECT * FROM videos WHERE presentation_id = ? ORDER BY created_at DESC LIMIT 1');
+    $video_stmt->execute([$presentation['id']]);
+    $video = $video_stmt->fetch() ?: null;
+    $has_video = $video && $video['status'] === 'complete';
     ?>
 
     <!-- Next Steps Bar -->
@@ -205,19 +213,49 @@
                 <?php endif; ?>
 
                 <!-- Step 3: Audio -->
+                <?php if ($has_images): ?>
+                <button onclick="generateAudio()" id="btn-generate-audio"
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_audio ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50 ring-2 ring-amber-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
+                    <span class="text-2xl mb-2"><?= $has_audio ? '&#10003;' : '&#127908;' ?></span>
+                    <span class="text-xs font-semibold <?= $has_audio ? 'text-green-700' : 'text-amber-700' ?>">
+                        <?= $has_audio ? 'Regenerate Audio' : 'Generate Audio' ?>
+                    </span>
+                    <span class="text-xs text-gray-400 mt-1"><?= count($slides) * CREDIT_COSTS['generate_audio'] ?> credits</span>
+                </button>
+                <?php else: ?>
                 <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
                     <span class="text-2xl mb-2">&#127908;</span>
                     <span class="text-xs font-semibold text-gray-400">Generate Audio</span>
-                    <span class="text-xs text-gray-300 mt-1">Coming soon</span>
+                    <span class="text-xs text-gray-300 mt-1">Render slides first</span>
                 </div>
+                <?php endif; ?>
 
                 <!-- Step 4: Video -->
-                <?php if ($has_html): ?>
+                <?php if ($has_audio): ?>
+                <button onclick="generateVideo()" id="btn-generate-video"
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_video ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50 ring-2 ring-red-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
+                    <span class="text-2xl mb-2"><?= $has_video ? '&#10003;' : '&#127916;' ?></span>
+                    <span class="text-xs font-semibold <?= $has_video ? 'text-green-700' : 'text-red-700' ?>">
+                        <?= $has_video ? 'Regenerate Video' : 'Generate Video' ?>
+                    </span>
+                    <span class="text-xs text-gray-400 mt-1"><?= CREDIT_COSTS['assemble_video'] ?> credits</span>
+                </button>
+                <?php elseif ($has_images): ?>
                 <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
                     <span class="text-2xl mb-2">&#127916;</span>
                     <span class="text-xs font-semibold text-gray-400">Generate Video</span>
-                    <span class="text-xs text-gray-300 mt-1">Coming soon</span>
+                    <span class="text-xs text-gray-300 mt-1">Generate audio first</span>
                 </div>
+                <?php endif; ?>
+
+                <!-- Download Video (if complete) -->
+                <?php if ($has_video): ?>
+                <a href="<?= e($video['file_url']) ?>" download
+                    class="flex flex-col items-center p-4 rounded-xl border-2 border-green-300 bg-green-100 transition hover:shadow-sm text-center">
+                    <span class="text-2xl mb-2">&#128229;</span>
+                    <span class="text-xs font-semibold text-green-700">Download MP4</span>
+                    <span class="text-xs text-gray-400 mt-1"><?= $video['duration_seconds'] ? $video['duration_seconds'] . 's' : '' ?></span>
+                </a>
                 <?php endif; ?>
             </div>
         </div>
@@ -442,15 +480,119 @@ async function renderAllSlides() {
     }
 }
 
-// Auto-save on field change
+// Auto-save: debounced — saves 2 seconds after user stops typing
+const autoSaveTimers = {};
 document.querySelectorAll('.slide-field').forEach(field => {
-    field.addEventListener('input', () => markDirty(parseInt(field.dataset.slideId)));
+    field.addEventListener('input', () => {
+        const slideId = parseInt(field.dataset.slideId);
+        markDirty(slideId);
+
+        // Clear previous timer for this slide
+        if (autoSaveTimers[slideId]) clearTimeout(autoSaveTimers[slideId]);
+
+        // Set new timer — save after 2s of no typing
+        autoSaveTimers[slideId] = setTimeout(() => {
+            saveSlide(slideId);
+        }, 2000);
+    });
 });
 
 // Warn before leaving with unsaved changes
 window.addEventListener('beforeunload', (e) => {
     if (dirtySlides.size > 0) { e.preventDefault(); e.returnValue = ''; }
 });
+
+// ── Project Management ──
+
+// ── Phase 3: Audio Generation ──
+
+async function generateAudio() {
+    const btn = document.getElementById('btn-generate-audio');
+    btn.disabled = true;
+
+    const audioCost = SLIDE_COUNT * <?= CREDIT_COSTS['generate_audio'] ?>;
+    showPipelineProgress('Generating narration audio...', `0 of ${SLIDE_COUNT} slides`, 5, 0);
+
+    let fakeProgress = 5;
+    const interval = setInterval(() => {
+        if (fakeProgress < 85) {
+            fakeProgress += Math.random() * 6;
+            const done = Math.min(SLIDE_COUNT, Math.floor((fakeProgress / 85) * SLIDE_COUNT));
+            showPipelineProgress('Generating narration audio...', `${done} of ${SLIDE_COUNT} slides`, fakeProgress, done * <?= CREDIT_COSTS['generate_audio'] ?>);
+        }
+    }, 3000);
+
+    const result = await api(`/api/generate/audio/${PRESENTATION_ID}`, { voice: 'alloy' });
+    clearInterval(interval);
+
+    if (result.success) {
+        showPipelineProgress('Audio complete!', `${result.data.success_count} slides narrated`, 100, result.data.credits_used);
+        toast(`Audio generated for ${result.data.success_count} slides. ${result.data.credits_used} credits used.`, 'success');
+
+        const me = await api('/api/auth/me', null, 'GET');
+        if (me.success) updateCreditsDisplay(me.data.credits_balance);
+
+        setTimeout(() => location.reload(), 2000);
+    } else {
+        toast(result.error || 'Audio generation failed', 'error');
+        btn.disabled = false;
+        hidePipelineProgress();
+    }
+}
+
+// ── Phase 3: Video Generation ──
+
+async function generateVideo() {
+    const btn = document.getElementById('btn-generate-video');
+    btn.disabled = true;
+
+    showPipelineProgress('Queueing video assembly...', 'Preparing', 10, <?= CREDIT_COSTS['assemble_video'] ?>);
+
+    const result = await api(`/api/generate/video/${PRESENTATION_ID}`);
+
+    if (!result.success) {
+        toast(result.error || 'Failed to queue video', 'error');
+        btn.disabled = false;
+        hidePipelineProgress();
+        return;
+    }
+
+    toast('Video queued! Processing will begin shortly.', 'info');
+    const videoId = result.data.video_id;
+
+    const me = await api('/api/auth/me', null, 'GET');
+    if (me.success) updateCreditsDisplay(me.data.credits_balance);
+
+    // Poll for status
+    pollVideoStatus(videoId);
+}
+
+async function pollVideoStatus(videoId) {
+    const poll = async () => {
+        const res = await api(`/api/videos/${videoId}/status`, null, 'GET');
+        if (!res.success) return;
+
+        const { status, progress_message, file_url } = res.data;
+
+        if (status === 'processing') {
+            showPipelineProgress('Assembling video...', progress_message || 'Processing...', 50, <?= CREDIT_COSTS['assemble_video'] ?>);
+            setTimeout(poll, 3000);
+        } else if (status === 'complete') {
+            showPipelineProgress('Video complete!', 'Ready to download', 100, <?= CREDIT_COSTS['assemble_video'] ?>);
+            toast('Video is ready! Reloading...', 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else if (status === 'failed') {
+            showPipelineProgress('Video failed', progress_message || 'An error occurred', 100, 0);
+            toast('Video generation failed. Try again.', 'error');
+            hidePipelineProgress();
+        } else if (status === 'queued') {
+            showPipelineProgress('Waiting in queue...', 'Your video will be processed shortly', 15, <?= CREDIT_COSTS['assemble_video'] ?>);
+            setTimeout(poll, 5000);
+        }
+    };
+
+    poll();
+}
 
 // ── Project Management ──
 
