@@ -80,6 +80,8 @@ class ApiSlideController
         if (isset($input['title']))         $data['title']         = $this->sanitize_field($input['title'], 255);
         if (isset($input['content']))       $data['content']       = $this->sanitize_field($input['content'], 10000);
         if (isset($input['speaker_notes'])) $data['speaker_notes'] = $this->sanitize_field($input['speaker_notes'], 10000);
+        if (isset($input['html_content']))  $data['html_content']  = $input['html_content']; // Can be large (base64 images)
+        if (array_key_exists('image_url', $input)) $data['image_url'] = $this->sanitize_field($input['image_url'] ?? '', 500);
         if (isset($input['layout_type'])) {
             $allowed_layouts = ['title', 'bullets', 'quote', 'image_left', 'image_right', 'two_column'];
             if (in_array($input['layout_type'], $allowed_layouts, true)) {
