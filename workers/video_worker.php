@@ -72,29 +72,40 @@ try {
         $slide_num = $i + 1;
         update_video_status($video_id, 'processing', "Processing slide {$slide_num} of {$total_slides}...");
 
-        // Get image path
+        // Find image — check multiple possible locations
         $image_path = null;
+        $possible_paths = [];
+
         if (!empty($slide['image_url'])) {
-            $image_path = APP_ROOT . '/public' . $slide['image_url'];
+            // Via symlink: public/storage/...
+            $possible_paths[] = APP_ROOT . '/public' . $slide['image_url'];
+            // Direct storage path (strip /storage/ prefix)
+            $possible_paths[] = STORAGE_PATH . '/' . ltrim(str_replace('/storage/', '', $slide['image_url']), '/');
+        }
+        // Fallback: check by slide order
+        $possible_paths[] = $storage_base . "/slides/slide_{$slide['slide_order']}.png";
+        $possible_paths[] = $storage_base . "/slides/slide_{$slide['slide_order']}.jpg";
+
+        foreach ($possible_paths as $p) {
+            if (file_exists($p)) { $image_path = $p; break; }
         }
 
-        // Also check storage directly
-        if (!$image_path || !file_exists($image_path)) {
-            $image_path = $storage_base . "/slides/slide_{$slide['slide_order']}.png";
-        }
-
-        if (!file_exists($image_path)) {
-            error_log("BrightStage Video Worker: Missing image for slide {$slide_num}");
+        if (!$image_path) {
+            error_log("BrightStage Video Worker: No image found for slide {$slide_num}. Checked: " . implode(', ', $possible_paths));
             continue;
         }
 
         // Get audio path
+        // Find audio file
         $audio_path = null;
+        $audio_paths = [];
         if (!empty($slide['audio_url'])) {
-            $audio_path = APP_ROOT . '/public' . $slide['audio_url'];
+            $audio_paths[] = APP_ROOT . '/public' . $slide['audio_url'];
+            $audio_paths[] = STORAGE_PATH . '/' . ltrim(str_replace('/storage/', '', $slide['audio_url']), '/');
         }
-        if (!$audio_path || !file_exists($audio_path)) {
-            $audio_path = $storage_base . "/audio/slide_{$slide['slide_order']}.mp3";
+        $audio_paths[] = $storage_base . "/audio/slide_{$slide['slide_order']}.mp3";
+        foreach ($audio_paths as $p) {
+            if (file_exists($p)) { $audio_path = $p; break; }
         }
 
         $segment_path = $video_dir . "/segment_{$slide_num}.mp4";

@@ -354,8 +354,14 @@ if (str_starts_with($uri, '/api/')) {
         $image_urls = [];
         foreach ($slides as $s) {
             if (!empty($s['image_url'])) {
-                $full_path = APP_ROOT . '/public' . $s['image_url'];
-                if (file_exists($full_path)) $image_urls[] = $full_path;
+                // Check both symlink path and direct storage path
+                $paths = [
+                    APP_ROOT . '/public' . $s['image_url'],
+                    STORAGE_PATH . '/' . ltrim(str_replace('/storage/', '', $s['image_url']), '/'),
+                ];
+                foreach ($paths as $p) {
+                    if (file_exists($p)) { $image_urls[] = $p; break; }
+                }
             }
         }
 

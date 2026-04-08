@@ -1,27 +1,26 @@
 /**
  * BrightStage Slide Renderer
  * Renders AI-generated HTML/CSS slides to PNG using html2canvas.
- * This is what gives us SurfSense-quality visuals without React/Remotion.
  *
- * Flow: AI generates HTML/CSS → inject into hidden div → html2canvas → PNG → upload to server
+ * Known issues addressed:
+ * - Google Fonts @import inside slide HTML won't load off-screen → we preload them
+ * - html2canvas needs the element to be in the DOM and styled
+ * - Large canvas (1920x1080) needs proper memory handling
  */
 
 const SlideRenderer = {
-    // Hidden container for off-screen rendering
     container: null,
 
-    /**
-     * Initialize the renderer by creating the off-screen container.
-     */
     init() {
         if (this.container) return;
 
         this.container = document.createElement('div');
         this.container.id = 'slide-render-container';
+        // Position off-screen but still rendered (not display:none)
         this.container.style.cssText = `
-            position: fixed;
-            left: -9999px;
-            top: -9999px;
+            position: absolute;
+            left: -3000px;
+            top: 0;
             width: 1920px;
             height: 1080px;
             overflow: hidden;
@@ -32,17 +31,49 @@ const SlideRenderer = {
     },
 
     /**
+     * Extract @import font URLs from HTML and preload them.
+     */
+    async preloadFonts(html) {
+        const imports = html.match(/@import\s+url\(['"]?([^'")\s]+)['"]?\)/gi) || [];
+        const fontUrls = imports.map(imp => {
+            const match = imp.match(/url\(['"]?([^'")\s]+)['"]?\)/);
+            return match ? match[1] : null;
+        }).filter(Boolean);
+
+        // Load each font stylesheet
+        const promises = fontUrls.map(url => {
+            return new Promise(resolve => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = url;
+                link.onload = resolve;
+                link.onerror = resolve; // Don't block on failure
+                document.head.appendChild(link);
+            });
+        });
+
+        if (promises.length > 0) {
+            await Promise.all(promises);
+            // Wait for font rendering
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+        }
+    },
+
+    /**
      * Render a single slide HTML to a PNG data URL.
-     * @param {string} html - The AI-generated HTML/CSS for the slide
-     * @returns {Promise<string>} Base64 PNG data URL
      */
     async renderSlide(html) {
         this.init();
 
+        // Preload any Google Fonts in the HTML
+        await this.preloadFonts(html);
+
         // Inject the slide HTML
         this.container.innerHTML = html;
 
-        // Wait for Google Fonts to load and images to render
+        // Wait for all resources
         await this.waitForResources();
 
         // Capture with html2canvas
@@ -51,25 +82,19 @@ const SlideRenderer = {
             height: 1080,
             scale: 1,
             useCORS: true,
-            allowTaint: false,
-            backgroundColor: null,
+            allowTaint: true,
+            backgroundColor: '#000000',
             logging: false,
         });
 
-        // Convert to PNG data URL
         const dataUrl = canvas.toDataURL('image/png');
-
-        // Clean up
         this.container.innerHTML = '';
 
         return dataUrl;
     },
 
-    /**
-     * Wait for fonts and images to load.
-     */
     async waitForResources() {
-        // Wait for Google Fonts
+        // Wait for fonts
         if (document.fonts && document.fonts.ready) {
             await document.fonts.ready;
         }
@@ -78,23 +103,19 @@ const SlideRenderer = {
         const images = this.container.querySelectorAll('img');
         const promises = Array.from(images).map(img => {
             if (img.complete) return Promise.resolve();
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
                 img.onload = resolve;
-                img.onerror = resolve; // Don't block on failed images
+                img.onerror = resolve;
             });
         });
         await Promise.all(promises);
 
-        // Extra settling time for CSS transitions/animations
-        await new Promise(r => setTimeout(r, 300));
+        // Settling time for CSS
+        await new Promise(r => setTimeout(r, 500));
     },
 
     /**
      * Render all slides and upload PNGs to server.
-     * @param {number} presentationId
-     * @param {Array} slides - Array of {id, html_content, slide_order}
-     * @param {Function} onProgress - Callback (current, total, message)
-     * @returns {Promise<{success: number, failed: number}>}
      */
     async renderAndUploadAll(presentationId, slides, onProgress) {
         this.init();
@@ -113,10 +134,8 @@ const SlideRenderer = {
             }
 
             try {
-                // Render to PNG
                 const dataUrl = await this.renderSlide(slide.html_content);
 
-                // Upload to server
                 onProgress(i + 1, total, `Uploading slide ${i + 1} of ${total}...`);
                 const result = await api(`/api/slides/${slide.id}/upload-image`, {
                     image_data: dataUrl,
@@ -124,7 +143,7 @@ const SlideRenderer = {
 
                 if (result.success) {
                     success++;
-                    // Update the preview in the UI if it exists
+                    // Update preview if visible
                     const preview = document.querySelector(`#slide-preview-${slide.id}`);
                     if (preview) {
                         preview.src = dataUrl;
@@ -141,17 +160,5 @@ const SlideRenderer = {
 
         onProgress(total, total, `Done! ${success} slides rendered.`);
         return { success, failed };
-    },
-
-    /**
-     * Render a single slide for preview (no upload).
-     * @param {string} html
-     * @param {HTMLImageElement} imgElement - Target img to show preview
-     */
-    async previewSlide(html, imgElement) {
-        if (!html) return;
-        const dataUrl = await this.renderSlide(html);
-        imgElement.src = dataUrl;
-        imgElement.style.display = 'block';
     },
 };
