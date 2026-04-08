@@ -72,6 +72,7 @@ try {
     }
 
     $segments = [];
+    $skipped_slides = [];
     $total_slides = count($slides);
 
     // Process each slide into a video segment
@@ -99,6 +100,7 @@ try {
 
         if (!$image_path) {
             error_log("BrightStage Video Worker: No image found for slide {$slide_num}. Checked: " . implode(', ', $possible_paths));
+            $skipped_slides[] = $slide_num;
             continue;
         }
 
@@ -190,11 +192,16 @@ try {
     $relative_url = "/storage/users/{$user_id}/presentations/{$pres_id}/video/final.mp4";
     $file_size = filesize($final_path);
 
+    $progress_msg = 'Complete!';
+    if (!empty($skipped_slides)) {
+        $progress_msg = 'Complete — slides ' . implode(', ', $skipped_slides) . ' skipped (no rendered images).';
+    }
+
     $stmt = $db->prepare(
         'UPDATE videos SET status = "complete", file_url = ?, file_size_bytes = ?, duration_seconds = ?,
-         progress_message = "Complete!", updated_at = NOW() WHERE id = ?'
+         progress_message = ?, updated_at = NOW() WHERE id = ?'
     );
-    $stmt->execute([$relative_url, $file_size, $duration_seconds, $video_id]);
+    $stmt->execute([$relative_url, $file_size, $duration_seconds, $progress_msg, $video_id]);
 
     // Update presentation status
     $stmt = $db->prepare('UPDATE presentations SET status = "video_ready", updated_at = NOW() WHERE id = ?');

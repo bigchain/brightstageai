@@ -113,10 +113,8 @@ async function duplicateProject(id) {
 }
 
 function renameProject(id, currentTitle) {
-    const newTitle = prompt('New title:', currentTitle);
-    if (!newTitle || newTitle === currentTitle) return;
-
-    api(`/api/presentations/${id}`, { title: newTitle }).then(result => {
+    promptInput('New title:', currentTitle, async (newTitle) => {
+        const result = await api(`/api/presentations/${id}`, { title: newTitle });
         if (result.success) {
             toast('Renamed!', 'success');
             setTimeout(() => location.reload(), 800);

@@ -147,6 +147,7 @@
                     src="<?= e($slide['image_url']) ?>"
                     alt="Slide <?= $slide['slide_order'] ?> preview"
                     class="rounded-lg shadow-md"
+                    loading="lazy"
                     style="max-height: 280px; width: auto;">
             </div>
             <?php endif; ?>
@@ -353,6 +354,11 @@
 
         <!-- Video Player (if video exists) -->
         <?php if ($has_video && !empty($video['file_url'])): ?>
+        <?php if ($video['progress_message'] && str_contains($video['progress_message'], 'skipped')): ?>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p class="text-sm text-amber-800"><?= e($video['progress_message']) ?> Render all slides before generating video for a complete result.</p>
+        </div>
+        <?php endif; ?>
         <div class="bg-white rounded-xl border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-4">
                 <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Your Video</p>
@@ -391,6 +397,8 @@
 <script>
 const PRESENTATION_ID = <?= $presentation['id'] ?>;
 const dirtySlides = new Set();
+const saveTimers = {};
+const savingSlides = new Set();
 
 // Slide data for rendering
 const SLIDES_DATA = <?= json_encode(array_map(function($s) {
@@ -407,9 +415,19 @@ function markDirty(slideId) {
     dirtySlides.add(slideId);
     const btn = document.querySelector(`.save-btn[data-slide-id="${slideId}"]`);
     if (btn) btn.style.display = '';
+
+    // Debounce auto-save: wait 1.5s after last edit before saving
+    if (saveTimers[slideId]) clearTimeout(saveTimers[slideId]);
+    saveTimers[slideId] = setTimeout(() => saveSlide(slideId), 1500);
 }
 
 async function saveSlide(slideId) {
+    // Prevent concurrent saves for the same slide
+    if (savingSlides.has(slideId)) return;
+    savingSlides.add(slideId);
+
+    if (saveTimers[slideId]) { clearTimeout(saveTimers[slideId]); delete saveTimers[slideId]; }
+
     const card = document.getElementById(`slide-${slideId}`);
     const fields = card.querySelectorAll('.slide-field');
     const data = {};
@@ -422,6 +440,8 @@ async function saveSlide(slideId) {
     if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
 
     const result = await api(`/api/slides/${slideId}/update`, data);
+
+    savingSlides.delete(slideId);
 
     if (result.success) {
         dirtySlides.delete(slideId);

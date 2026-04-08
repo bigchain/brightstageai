@@ -61,6 +61,20 @@ class ApiSlideController
     }
 
     /**
+     * Sanitize HTML content — strip scripts, event handlers, dangerous elements.
+     */
+    private function sanitize_html(string $html): string
+    {
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/si', '', $html);
+        $html = preg_replace('/\bon\w+\s*=\s*["\'][^"\']*["\']/i', '', $html);
+        $html = preg_replace('/\bon\w+\s*=\s*\S+/i', '', $html);
+        $html = preg_replace('/<(iframe|object|embed|applet|form|input|button|select|textarea)\b[^>]*>.*?<\/\1>/si', '', $html);
+        $html = preg_replace('/<(iframe|object|embed|applet|form|input|button|select|textarea)\b[^>]*\/?>/si', '', $html);
+        $html = preg_replace('/javascript\s*:/i', '', $html);
+        return $html;
+    }
+
+    /**
      * Update a slide's content.
      * POST /api/slides/{id}/update
      */
@@ -80,7 +94,7 @@ class ApiSlideController
         if (isset($input['title']))         $data['title']         = $this->sanitize_field($input['title'], 255);
         if (isset($input['content']))       $data['content']       = $this->sanitize_field($input['content'], 10000);
         if (isset($input['speaker_notes'])) $data['speaker_notes'] = $this->sanitize_field($input['speaker_notes'], 10000);
-        if (isset($input['html_content']))  $data['html_content']  = $input['html_content']; // Can be large (base64 images)
+        if (isset($input['html_content']))  $data['html_content']  = $this->sanitize_html($input['html_content']); // Can be large (base64 images)
         if (array_key_exists('image_url', $input)) $data['image_url'] = $this->sanitize_field($input['image_url'] ?? '', 500);
         if (isset($input['layout_type'])) {
             $allowed_layouts = ['title', 'bullets', 'quote', 'image_left', 'image_right', 'two_column'];

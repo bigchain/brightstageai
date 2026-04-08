@@ -9,6 +9,7 @@ require_once __DIR__ . '/../src/config/app.php';
 require_once __DIR__ . '/../src/config/database.php';
 require_once __DIR__ . '/../src/helpers/functions.php';
 require_once __DIR__ . '/../src/middleware/auth.php';
+require_once __DIR__ . '/../src/middleware/rate_limit.php';
 
 // Security headers — prevent clickjacking, XSS, MIME sniffing
 header('X-Frame-Options: DENY');
@@ -80,6 +81,7 @@ if (str_starts_with($uri, '/api/')) {
     if ($uri === '/api/generate/image' && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
         if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+        if (!check_rate_limit('generate_image', 20, 60)) json_error('Too many requests. Please wait a moment.', 429);
 
         $input = json_decode(file_get_contents('php://input'), true);
         $prompt = mb_substr(trim($input['prompt'] ?? ''), 0, 1000);
@@ -110,6 +112,7 @@ if (str_starts_with($uri, '/api/')) {
 
     // Generation API
     if (preg_match('#^/api/generate/slides/(\d+)$#', $uri, $m) && $method === 'POST') {
+        if (is_logged_in() && !check_rate_limit('generate_slide', 10, 60)) json_error('Too many requests. Please wait a moment.', 429);
         require_once APP_ROOT . '/src/controllers/ApiGenerateController.php';
         (new ApiGenerateController())->generate_slides((int)$m[1]);
     }
@@ -118,6 +121,7 @@ if (str_starts_with($uri, '/api/')) {
     if (preg_match('#^/api/slides/(\d+)/regenerate-design$#', $uri, $m) && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
         if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+        if (!check_rate_limit('regenerate_slide', 20, 60)) json_error('Too many requests. Please wait a moment.', 429);
 
         $slide_id = (int)$m[1];
         $user = current_user();
@@ -188,6 +192,7 @@ if (str_starts_with($uri, '/api/')) {
     if (preg_match('#^/api/generate/audio/(\d+)$#', $uri, $m) && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
         if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+        if (!check_rate_limit('generate_audio', 5, 60)) json_error('Too many requests. Please wait a moment.', 429);
 
         $pres_id = (int)$m[1];
         $user = current_user();
@@ -253,6 +258,7 @@ if (str_starts_with($uri, '/api/')) {
     if (preg_match('#^/api/generate/video/(\d+)$#', $uri, $m) && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
         if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+        if (!check_rate_limit('assemble_video', 3, 60)) json_error('Too many requests. Please wait a moment.', 429);
 
         $pres_id = (int)$m[1];
         $user = current_user();
@@ -449,11 +455,13 @@ if (str_starts_with($uri, '/api/')) {
 
         if (!$has_content) json_error('No slides to export.');
 
-        // Generate printable HTML
+        // Generate printable HTML — browser print-to-PDF
+        $safe_title = preg_replace('/[^a-zA-Z0-9_\- ]/', '', $pres['title']);
         header('Content-Type: text/html');
+        header('Content-Disposition: inline; filename="' . ($safe_title ?: 'presentation') . '.html"');
         echo '<!DOCTYPE html><html><head><title>' . htmlspecialchars($pres['title']) . '</title>';
-        echo '<style>@page{size:landscape;margin:0}body{margin:0}.slide{width:100vw;height:100vh;page-break-after:always;overflow:hidden;position:relative}img.slide-img{width:100%;height:100%;object-fit:contain;display:block}.slide-html{width:1920px;height:1080px;transform-origin:top left;}</style>';
-        echo '<script>window.onload=function(){document.querySelectorAll(".slide-html").forEach(function(el){var s=Math.min(window.innerWidth/1920,window.innerHeight/1080);el.style.transform="scale("+s+")";});}</script>';
+        echo '<style>@page{size:landscape;margin:0}body{margin:0}.slide{width:100vw;height:100vh;page-break-after:always;overflow:hidden;position:relative}img.slide-img{width:100%;height:100%;object-fit:contain;display:block}.slide-html{width:1920px;height:1080px;transform-origin:top left;}@media print{.no-print{display:none!important}}</style>';
+        echo '<script>window.onload=function(){document.querySelectorAll(".slide-html").forEach(function(el){var s=Math.min(window.innerWidth/1920,window.innerHeight/1080);el.style.transform="scale("+s+")";});window.print();}</script>';
         echo '</head><body>';
         foreach ($slide_entries as $entry) {
             if ($entry['type'] === 'image') {
@@ -511,6 +519,7 @@ if (str_starts_with($uri, '/api/')) {
     if ($uri === '/api/generate/outline-preview' && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);
         if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+        if (!check_rate_limit('generate_outline', 5, 60)) json_error('Too many requests. Please wait a moment.', 429);
 
         $input = json_decode(file_get_contents('php://input'), true);
         $topic    = mb_substr(trim($input['topic'] ?? ''), 0, 2000);

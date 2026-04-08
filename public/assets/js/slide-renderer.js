@@ -110,8 +110,11 @@ const SlideRenderer = {
         });
         await Promise.all(promises);
 
-        // Settling time for CSS
-        await new Promise(r => setTimeout(r, 500));
+        // Settling time for CSS — scale based on content complexity
+        const hasImages = images.length > 0;
+        const hasImports = this.container.innerHTML.includes('@import');
+        const wait = hasImages || hasImports ? 800 : 300;
+        await new Promise(r => setTimeout(r, wait));
     },
 
     /**
@@ -133,28 +136,34 @@ const SlideRenderer = {
                 continue;
             }
 
-            try {
-                const dataUrl = await this.renderSlide(slide.html_content);
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    const dataUrl = await this.renderSlide(slide.html_content);
 
-                onProgress(i + 1, total, `Uploading slide ${i + 1} of ${total}...`);
-                const result = await api(`/api/slides/${slide.id}/upload-image`, {
-                    image_data: dataUrl,
-                });
+                    onProgress(i + 1, total, `Uploading slide ${i + 1} of ${total}...`);
+                    const result = await api(`/api/slides/${slide.id}/upload-image`, {
+                        image_data: dataUrl,
+                    });
 
-                if (result.success) {
-                    success++;
-                    // Update preview if visible
-                    const preview = document.querySelector(`#slide-preview-${slide.id}`);
-                    if (preview) {
-                        preview.src = dataUrl;
-                        preview.style.display = 'block';
+                    if (result.success) {
+                        success++;
+                        const preview = document.querySelector(`#slide-preview-${slide.id}`);
+                        if (preview) {
+                            preview.src = dataUrl;
+                            preview.style.display = 'block';
+                        }
+                        break;
+                    } else if (attempt === 2) {
+                        failed++;
                     }
-                } else {
-                    failed++;
+                } catch (err) {
+                    if (attempt === 2) {
+                        console.error(`Failed to render slide ${slide.id} after 2 attempts:`, err);
+                        failed++;
+                    } else {
+                        await new Promise(r => setTimeout(r, 500));
+                    }
                 }
-            } catch (err) {
-                console.error(`Failed to render slide ${slide.id}:`, err);
-                failed++;
             }
         }
 

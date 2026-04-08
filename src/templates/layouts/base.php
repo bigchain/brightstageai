@@ -6,7 +6,8 @@
     <title><?= e($page_title ?? 'BrightStage Video') ?> — BrightStage</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Poppins:wght@400;600;800&family=Playfair+Display:wght@700&family=Raleway:wght@400;700&family=Montserrat:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Playfair+Display:wght@700&family=Raleway:wght@400;700&family=Montserrat:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -171,6 +172,36 @@
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) overlay.remove();
             });
+        }
+
+        // ── Prompt Input Dialog (replaces prompt()) ──
+        function promptInput(label, defaultValue, onSubmit) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 w-full" style="animation:fadeInUp 0.2s ease;">
+                    <p class="text-gray-900 font-medium mb-4">${label}</p>
+                    <input type="text" id="prompt-input"
+                        class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none mb-6">
+                    <div class="flex justify-end space-x-3">
+                        <button onclick="this.closest('[style]').remove()" class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Cancel</button>
+                        <button id="prompt-submit" class="px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 transition">OK</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            const input = overlay.querySelector('#prompt-input');
+            input.value = defaultValue || '';  // Set via DOM property — safe, no innerHTML injection
+            input.focus();
+            input.select();
+            const submit = () => {
+                const val = input.value.trim();
+                overlay.remove();
+                if (val && val !== defaultValue) onSubmit(val);
+            };
+            overlay.querySelector('#prompt-submit').onclick = submit;
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
         }
 
         // Helper: make API calls with error handling
