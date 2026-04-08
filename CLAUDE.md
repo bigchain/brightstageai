@@ -249,3 +249,5 @@ PHP sessions + bcrypt passwords + CSRF token on every form
 | Full media kit | 25 |
 
 Full 10-slide presentation + media kit ≈ 110 credits
+su - convertpods -c "ln -sf /home/convertpods/brightstageai/storage /home/convertpods/brightstageai/public/storage"
+su - convertpods -c "cd ~/brightstageai && git pull"

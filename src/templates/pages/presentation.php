@@ -120,10 +120,10 @@
                     </div>
                 </div>
                 <!-- Hidden file inputs -->
+                <input type="file" id="img-upload-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
+                    onchange="uploadSlideImage(<?= $slide['id'] ?>, this.files[0])">
                 <input type="file" id="bg-upload-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
-                    onchange="uploadBackground(<?= $slide['id'] ?>, this.files[0])">
-                <input type="file" id="slide-replace-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
-                    onchange="uploadSingleSlide(<?= $slide['id'] ?>, this.files[0])">
+                    onchange="uploadSlideBg(<?= $slide['id'] ?>, this.files[0])">
 
                 <!-- Save bar (shown during manual edit) -->
                 <div id="edit-bar-<?= $slide['id'] ?>" class="hidden absolute top-3 left-3 right-3 flex items-center justify-between z-10">
@@ -793,7 +793,7 @@ function showImageOptions(slideId) {
             <!-- Upload -->
             <div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <label class="block text-xs font-semibold text-gray-700 mb-2">Upload Your Own</label>
-                <button onclick="document.getElementById('bg-upload-${slideId}').click(); this.closest('[style]').remove();"
+                <button onclick="document.getElementById('img-upload-${slideId}').click(); this.closest('[style]').remove();"
                     class="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600 transition">
                     Choose File (PNG, JPG, WebP)
                 </button>
@@ -854,31 +854,16 @@ async function generateSlideImage(slideId) {
     const prompt = document.getElementById(`ai-image-prompt-${slideId}`)?.value?.trim();
     if (!prompt) { toast('Describe the image you want', 'warning'); return; }
 
-    // Show loading on the slide
     const wrapper = document.querySelector(`#slide-${slideId} .slide-preview-wrapper`);
-    let loadingEl = null;
-    if (wrapper) {
-        loadingEl = document.createElement('div');
-        loadingEl.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20;border-radius:12px;';
-        loadingEl.innerHTML = '<div style="text-align:center;"><div class="animate-spin" style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;margin:0 auto 12px;"></div><div style="color:#fff;font-size:13px;">Generating image...</div></div>';
-        wrapper.style.position = 'relative';
-        wrapper.appendChild(loadingEl);
-    }
+    let loadingEl = showSlideLoading(wrapper, 'Generating image...');
 
     const result = await api('/api/generate/image', { prompt, slide_id: slideId });
     if (loadingEl) loadingEl.remove();
 
     if (result.success && result.data.image_url) {
-        // Apply as background on the slide
         const preview = document.getElementById(`live-preview-${slideId}`);
         if (preview) {
-            const slideRoot = preview.firstElementChild;
-            if (slideRoot) {
-                slideRoot.style.backgroundImage = `url(${result.data.image_url})`;
-                slideRoot.style.backgroundSize = 'cover';
-                slideRoot.style.backgroundPosition = 'center';
-            }
-            // Save modified HTML
+            applyImageToSlide(preview, result.data.image_url);
             await api(`/api/slides/${slideId}/update`, { html_content: preview.innerHTML, image_url: '' });
         }
 
@@ -891,36 +876,96 @@ async function generateSlideImage(slideId) {
     }
 }
 
-async function uploadBackground(slideId, file) {
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { toast('Image must be under 10MB', 'warning'); return; }
+/**
+ * Apply an image to the correct place in a slide.
+ * Priority: 1) Replace existing <img> src  2) Replace placeholder div  3) Set as background
+ */
+function applyImageToSlide(preview, imageUrl) {
+    // 1. Try to find an existing <img> tag and replace its src
+    const existingImg = preview.querySelector('img');
+    if (existingImg) {
+        existingImg.src = imageUrl;
+        existingImg.style.objectFit = 'cover';
+        return;
+    }
 
-    toast('Applying background...', 'info', 2000);
+    // 2. Try to find a placeholder div (gradient box with no text, likely the image area)
+    //    Look for divs that have a gradient/solid background and no meaningful text
+    const allDivs = preview.querySelectorAll('div');
+    for (const div of allDivs) {
+        const bg = div.style.background || div.style.backgroundImage || '';
+        const hasGradient = bg.includes('gradient') || bg.includes('linear');
+        const hasNoText = (div.innerText || '').trim().length < 5;
+        const isLargeEnough = div.offsetWidth > 200 && div.offsetHeight > 200;
+
+        if (hasGradient && hasNoText && isLargeEnough) {
+            // Replace placeholder with image
+            div.style.backgroundImage = `url(${imageUrl})`;
+            div.style.backgroundSize = 'cover';
+            div.style.backgroundPosition = 'center';
+            div.innerHTML = ''; // Remove any placeholder icon
+            return;
+        }
+    }
+
+    // 3. Fallback: set as background on the root slide element
+    const slideRoot = preview.firstElementChild;
+    if (slideRoot) {
+        slideRoot.style.backgroundImage = `url(${imageUrl})`;
+        slideRoot.style.backgroundSize = 'cover';
+        slideRoot.style.backgroundPosition = 'center';
+    }
+}
+
+/**
+ * Show a loading overlay on a slide wrapper. Returns the element to remove later.
+ */
+function showSlideLoading(wrapper, message) {
+    if (!wrapper) return null;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20;border-radius:12px;';
+    el.innerHTML = `<div style="text-align:center;"><div class="animate-spin" style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;margin:0 auto 12px;"></div><div style="color:#fff;font-size:13px;">${message}</div></div>`;
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(el);
+    return el;
+}
+
+// Upload image → replaces <img> or placeholder in the slide (smart placement)
+async function uploadSlideImage(slideId, file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast('Max 10MB', 'warning'); return; }
 
     const reader = new FileReader();
     reader.onload = async function(e) {
         const preview = document.getElementById(`live-preview-${slideId}`);
         if (!preview) return;
+        applyImageToSlide(preview, e.target.result);
+        const result = await api(`/api/slides/${slideId}/update`, { html_content: preview.innerHTML, image_url: '' });
+        if (result.success) toast('Image added to slide!', 'success');
+        else toast(result.error || 'Failed to save', 'error');
+    };
+    reader.readAsDataURL(file);
+    document.getElementById(`img-upload-${slideId}`).value = '';
+}
 
-        // Find the outermost div in the slide HTML and set its background-image
+// Upload background → sets as background-image on the root slide element
+async function uploadSlideBg(slideId, file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast('Max 10MB', 'warning'); return; }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const preview = document.getElementById(`live-preview-${slideId}`);
+        if (!preview) return;
         const slideRoot = preview.firstElementChild;
         if (slideRoot) {
             slideRoot.style.backgroundImage = `url(${e.target.result})`;
             slideRoot.style.backgroundSize = 'cover';
             slideRoot.style.backgroundPosition = 'center';
         }
-
-        // Save modified HTML
-        const result = await api(`/api/slides/${slideId}/update`, {
-            html_content: preview.innerHTML,
-            image_url: '',
-        });
-
-        if (result.success) {
-            toast('Background updated! Text preserved.', 'success');
-        } else {
-            toast(result.error || 'Failed to save', 'error');
-        }
+        const result = await api(`/api/slides/${slideId}/update`, { html_content: preview.innerHTML, image_url: '' });
+        if (result.success) toast('Background updated!', 'success');
+        else toast(result.error || 'Failed to save', 'error');
     };
     reader.readAsDataURL(file);
     document.getElementById(`bg-upload-${slideId}`).value = '';
