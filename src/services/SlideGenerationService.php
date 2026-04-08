@@ -42,8 +42,8 @@ LAYOUT TYPES — design MUST match the requested layout:
 - "title": Large centered title with subtitle below. Full gradient background. Minimal text, maximum impact. Big bold heading (72px+), elegant subtitle (28px). Centered vertically and horizontally.
 - "bullets": Title at top-left, bullet points below with generous spacing (40px between items). Each bullet has a colored accent dot/icon. Clean left-aligned layout.
 - "quote": Large quotation mark icon (decorative). The content is displayed as a featured quote in large italic text (36-48px), centered. Attribution/source below in smaller text. Elegant, spacious layout.
-- "image_left": Split layout — left 45% has a colored placeholder area (use a gradient box with an icon or pattern as image placeholder), right 55% has the title and bullet points. Content flows on the right side.
-- "image_right": Split layout — left 55% has the title and bullet points, right 45% has a colored placeholder area (gradient box with icon/pattern). Mirror of image_left.
+- "image_left": Split layout — left 45% has a relevant image using <img src="https://picsum.photos/seed/KEYWORD/860/1080" style="width:100%;height:100%;object-fit:cover;"> where KEYWORD is a relevant word from the slide topic. Right 55% has the title and bullet points.
+- "image_right": Split layout — left 55% has the title and bullet points, right 45% has a relevant image using <img src="https://picsum.photos/seed/KEYWORD/860/1080" style="width:100%;height:100%;object-fit:cover;"> where KEYWORD relates to the content.
 - "two_column": Title spans full width at top. Below: two equal columns side by side. Split the content bullets roughly in half between columns. Each column has its own subtle background or border.
 PROMPT;
 

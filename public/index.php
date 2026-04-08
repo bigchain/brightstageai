@@ -54,6 +54,38 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiSlideController())->delete((int)$m[1]);
     }
 
+    // AI Image Generation
+    if ($uri === '/api/generate/image' && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $prompt = mb_substr(trim($input['prompt'] ?? ''), 0, 1000);
+        $slide_id = (int)($input['slide_id'] ?? 0);
+
+        if ($prompt === '') json_error('Image description is required');
+
+        $user = current_user();
+
+        // Check credits
+        require_once APP_ROOT . '/src/models/UserModel.php';
+        $users = new UserModel();
+        $cost = CREDIT_COSTS['generate_image'];
+        if (!$users->deduct_credits($user['id'], $cost, 'generate_image')) {
+            json_error("Not enough credits. Need {$cost}.");
+        }
+
+        require_once APP_ROOT . '/src/services/ImageGenerationService.php';
+        $service = new ImageGenerationService();
+        $data_url = $service->generate($prompt);
+
+        if ($data_url === null) {
+            json_error('Image generation failed. Try again.');
+        }
+
+        json_success(['image_url' => $data_url, 'credits_used' => $cost]);
+    }
+
     // Generation API
     if (preg_match('#^/api/generate/slides/(\d+)$#', $uri, $m) && $method === 'POST') {
         require_once APP_ROOT . '/src/controllers/ApiGenerateController.php';

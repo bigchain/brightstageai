@@ -97,9 +97,9 @@
                             class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/20 hover:bg-white/30 backdrop-blur shadow transition">
                             &#9998; Edit Text
                         </button>
-                        <button onclick="showBgUpload(<?= $slide['id'] ?>)"
+                        <button onclick="showImageOptions(<?= $slide['id'] ?>)"
                             class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/20 hover:bg-white/30 backdrop-blur shadow transition">
-                            &#127912; Background
+                            &#127912; Image
                         </button>
                         <button onclick="changeSlideLayout(<?= $slide['id'] ?>, '<?= e($slide['layout_type']) ?>')"
                             class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/20 hover:bg-white/30 backdrop-blur shadow transition">
@@ -763,44 +763,96 @@ function initDragReorder() {
 // Init on page load
 document.addEventListener('DOMContentLoaded', initDragReorder);
 
-// ── Background Upload (keeps text, changes BG) ──
+// ── Image Options (AI generate, upload, background color) ──
 
-function showBgUpload(slideId) {
+function showImageOptions(slideId) {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 w-full" style="animation:fadeInUp 0.2s ease;">
-            <h3 class="text-lg font-bold text-gray-900 mb-2">Change Slide Background</h3>
-            <p class="text-sm text-gray-500 mb-4">Upload an image or set a background color. Text stays the same.</p>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Upload Background Image</label>
-                    <button onclick="document.getElementById('bg-upload-${slideId}').click(); this.closest('[style]').remove();"
-                        class="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600 transition">
-                        Choose Image (PNG, JPG, WebP)
-                    </button>
-                </div>
-                <div class="text-center text-xs text-gray-400">— or —</div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Set Background Color</label>
-                    <div class="flex items-center space-x-2">
-                        <input type="color" id="bg-color-${slideId}" value="#1e3a5f" class="w-10 h-10 rounded border cursor-pointer">
-                        <button onclick="applyBgColor(${slideId}); this.closest('[style]').remove();"
-                            class="flex-1 py-2.5 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 transition">Apply Color</button>
-                    </div>
-                </div>
-                <div>
-                    <button onclick="regenerateWithPrompt(${slideId}); this.closest('[style]').remove();"
-                        class="w-full py-2.5 rounded-lg text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 transition">
-                        &#10024; Or describe the background you want (AI)
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg mx-4 w-full" style="animation:fadeInUp 0.2s ease;">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Slide Image & Background</h3>
+
+            <!-- AI Generate -->
+            <div class="mb-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
+                <label class="block text-xs font-semibold text-purple-700 mb-2">AI Generate Image (${<?= CREDIT_COSTS['generate_image'] ?>} credits)</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="ai-image-prompt-${slideId}" placeholder="e.g., cats and dogs playing together, professional photo"
+                        class="flex-1 px-3 py-2 border border-purple-200 rounded-lg text-sm focus:ring-2 focus:ring-purple-400 outline-none">
+                    <button onclick="generateSlideImage(${slideId}); this.closest('[style]').remove();"
+                        class="px-4 py-2 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 transition whitespace-nowrap">
+                        &#10024; Generate
                     </button>
                 </div>
             </div>
+
+            <!-- Upload -->
+            <div class="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <label class="block text-xs font-semibold text-gray-700 mb-2">Upload Your Own Image</label>
+                <div class="flex space-x-2">
+                    <button onclick="document.getElementById('bg-upload-${slideId}').click(); this.closest('[style]').remove();"
+                        class="flex-1 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-400 hover:text-brand-600 transition">
+                        Choose File (PNG, JPG, WebP)
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Sets as slide background — text stays</p>
+            </div>
+
+            <!-- Background Color -->
+            <div class="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <label class="block text-xs font-semibold text-gray-700 mb-2">Background Color</label>
+                <div class="flex items-center space-x-2">
+                    <input type="color" id="bg-color-${slideId}" value="#1e3a5f" class="w-10 h-10 rounded border cursor-pointer">
+                    <button onclick="applyBgColor(${slideId}); this.closest('[style]').remove();"
+                        class="flex-1 py-2.5 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 transition">Apply</button>
+                </div>
+            </div>
+
             <button onclick="this.closest('[style]').remove()" class="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
         </div>
     `;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function generateSlideImage(slideId) {
+    const prompt = document.getElementById(`ai-image-prompt-${slideId}`)?.value?.trim();
+    if (!prompt) { toast('Describe the image you want', 'warning'); return; }
+
+    // Show loading on the slide
+    const wrapper = document.querySelector(`#slide-${slideId} .slide-preview-wrapper`);
+    let loadingEl = null;
+    if (wrapper) {
+        loadingEl = document.createElement('div');
+        loadingEl.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20;border-radius:12px;';
+        loadingEl.innerHTML = '<div style="text-align:center;"><div class="animate-spin" style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;margin:0 auto 12px;"></div><div style="color:#fff;font-size:13px;">Generating image...</div></div>';
+        wrapper.style.position = 'relative';
+        wrapper.appendChild(loadingEl);
+    }
+
+    const result = await api('/api/generate/image', { prompt, slide_id: slideId });
+    if (loadingEl) loadingEl.remove();
+
+    if (result.success && result.data.image_url) {
+        // Apply as background on the slide
+        const preview = document.getElementById(`live-preview-${slideId}`);
+        if (preview) {
+            const slideRoot = preview.firstElementChild;
+            if (slideRoot) {
+                slideRoot.style.backgroundImage = `url(${result.data.image_url})`;
+                slideRoot.style.backgroundSize = 'cover';
+                slideRoot.style.backgroundPosition = 'center';
+            }
+            // Save modified HTML
+            await api(`/api/slides/${slideId}/update`, { html_content: preview.innerHTML, image_url: '' });
+        }
+
+        const me = await api('/api/auth/me', null, 'GET');
+        if (me.success) updateCreditsDisplay(me.data.credits_balance);
+
+        toast(`Image generated! ${result.data.credits_used} credits used.`, 'success');
+    } else {
+        toast(result.error || 'Image generation failed', 'error');
+    }
 }
 
 async function uploadBackground(slideId, file) {
