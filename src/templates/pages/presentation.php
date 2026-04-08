@@ -666,9 +666,13 @@ async function switchTemplate(templateId) {
     overlay.innerHTML = `
         <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4" style="animation:fadeInUp 0.2s ease;">
             <h3 class="text-lg font-bold text-gray-900 mb-2">Template Changed</h3>
-            <p class="text-sm text-gray-500 mb-6">Do you want to redesign all slides with the new template? This costs ${SLIDE_COUNT * CREDIT_PER_SLIDE} credits.</p>
+            <p class="text-sm text-gray-500 mb-3">Do you want to redesign all slides with the new template?</p>
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+                <p class="text-xs text-amber-800"><strong>Warning:</strong> Redesigning will replace all slide visuals including any custom images you uploaded. Text content and narration are preserved.</p>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">Cost: ${SLIDE_COUNT * CREDIT_PER_SLIDE} credits</p>
             <div class="flex justify-end space-x-3">
-                <button onclick="this.closest('[style]').remove(); toast('Template saved. Slides keep current design.', 'info')"
+                <button onclick="this.closest('[style]').remove(); toast('Template saved for new slides. Current designs unchanged.', 'info')"
                     class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Keep Current Designs</button>
                 <button onclick="this.closest('[style]').remove(); generateSlideDesigns()"
                     class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition">
