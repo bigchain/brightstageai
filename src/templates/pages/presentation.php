@@ -1430,12 +1430,16 @@ async function duplicatePresentation() {
 // ── Slideshow Preview ──
 
 function openSlideshow() {
-    const slidesForShow = SLIDES_DATA.map(s => ({
-        image_url: s.image_url || null,
-        html_content: s.html_content || null,
-        title: s.title || `Slide ${s.slide_order}`,
-        slide_order: s.slide_order,
-    }));
+    // Build slides from what's actually on the page (not from JS data which may be stale/truncated)
+    const slidesForShow = SLIDES_DATA.map(s => {
+        const livePreview = document.getElementById(`live-preview-${s.id}`);
+        return {
+            image_url: s.image_url || null,
+            html_content: livePreview ? livePreview.innerHTML : (s.html_content || null),
+            title: s.title || `Slide ${s.slide_order}`,
+            slide_order: s.slide_order,
+        };
+    });
 
     if (slidesForShow.filter(s => s.image_url || s.html_content).length === 0) {
         toast('No slides to preview. Design your slides first.', 'warning');
