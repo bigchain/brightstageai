@@ -65,7 +65,9 @@ class TTSService
                 continue;
             }
 
-            $filename = "slide_{$slide['slide_order']}.mp3";
+            // Detect format from header (WAV starts with RIFF, MP3 starts with ID3 or FF)
+            $ext = (substr($audio_data, 0, 4) === 'RIFF') ? 'wav' : 'mp3';
+            $filename = "slide_{$slide['slide_order']}.{$ext}";
             file_put_contents($storage_path . '/' . $filename, $audio_data);
 
             $results[] = [
@@ -170,11 +172,10 @@ class TTSService
      */
     private function pcm16_to_mp3(string $pcm_data): ?string
     {
-        $ffmpeg = trim(shell_exec('which ffmpeg 2>/dev/null') ?? '');
-        if ($ffmpeg === '') $ffmpeg = '/usr/bin/ffmpeg';
+        $ffmpeg = '/usr/bin/ffmpeg';
 
         $pcm_file = tempnam(sys_get_temp_dir(), 'pcm_');
-        $mp3_file = tempnam(sys_get_temp_dir(), 'mp3_') . '.mp3';
+        $mp3_file = $pcm_file . '.mp3';
 
         file_put_contents($pcm_file, $pcm_data);
 
@@ -185,19 +186,65 @@ class TTSService
             escapeshellarg($mp3_file)
         );
 
-        shell_exec($cmd);
-        unlink($pcm_file);
+        // Try multiple execution methods (shell_exec may be disabled on shared hosting)
+        $output = null;
+        if (function_exists('exec')) {
+            exec($cmd, $output_lines, $return_code);
+        } elseif (function_exists('shell_exec')) {
+            shell_exec($cmd);
+        } elseif (function_exists('system')) {
+            system($cmd);
+        } elseif (function_exists('passthru')) {
+            passthru($cmd);
+        } else {
+            // No exec functions available — wrap PCM in WAV header instead (no FFmpeg needed)
+            @unlink($pcm_file);
+            return $this->pcm16_to_wav($pcm_data);
+        }
+
+        @unlink($pcm_file);
 
         if (!file_exists($mp3_file) || filesize($mp3_file) < 100) {
-            error_log('BrightStage TTS: FFmpeg PCM→MP3 conversion failed');
-            if (file_exists($mp3_file)) unlink($mp3_file);
-            return null;
+            error_log('BrightStage TTS: FFmpeg PCM→MP3 failed. Falling back to WAV.');
+            @unlink($mp3_file);
+            // Fallback: wrap raw PCM in a WAV header (works in all browsers, no FFmpeg needed)
+            return $this->pcm16_to_wav($pcm_data);
         }
 
         $mp3_data = file_get_contents($mp3_file);
-        unlink($mp3_file);
+        @unlink($mp3_file);
 
         return $mp3_data;
+    }
+
+    /**
+     * Wrap raw PCM16 data in a WAV header. No external tools needed.
+     * WAV is larger but plays in all browsers and works with FFmpeg for video.
+     */
+    private function pcm16_to_wav(string $pcm_data): string
+    {
+        $sample_rate = 24000;
+        $channels = 1;
+        $bits_per_sample = 16;
+        $data_size = strlen($pcm_data);
+        $byte_rate = $sample_rate * $channels * ($bits_per_sample / 8);
+        $block_align = $channels * ($bits_per_sample / 8);
+
+        $header = 'RIFF'
+            . pack('V', 36 + $data_size)    // File size - 8
+            . 'WAVE'
+            . 'fmt '
+            . pack('V', 16)                 // Subchunk1 size
+            . pack('v', 1)                  // Audio format (PCM)
+            . pack('v', $channels)           // Channels
+            . pack('V', $sample_rate)        // Sample rate
+            . pack('V', $byte_rate)          // Byte rate
+            . pack('v', $block_align)        // Block align
+            . pack('v', $bits_per_sample)    // Bits per sample
+            . 'data'
+            . pack('V', $data_size);         // Data size
+
+        return $header . $pcm_data;
     }
 
     private function split_text(string $text, int $max_chars): array

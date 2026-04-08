@@ -70,9 +70,10 @@ if (str_starts_with($uri, '/api/')) {
 
         if ($audio === null) json_error('Voice preview failed. TTS service may be unavailable.');
 
-        // Return as base64 data URL
+        // Return as base64 data URL (detect WAV vs MP3)
         $b64 = base64_encode($audio);
-        json_success(['audio_data' => "data:audio/mp3;base64,{$b64}"]);
+        $mime = (substr($audio, 0, 4) === 'RIFF') ? 'audio/wav' : 'audio/mpeg';
+        json_success(['audio_data' => "data:{$mime};base64,{$b64}"]);
     }
 
     // AI Image Generation
