@@ -164,3 +164,24 @@ function user_storage_path(int $user_id, int $presentation_id = 0): string
     }
     return $path;
 }
+
+/**
+ * Get MIME type from file path. Works without fileinfo extension.
+ */
+function get_mime_type(string $path): string
+{
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $map = [
+        'png'  => 'image/png',
+        'jpg'  => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+        'gif'  => 'image/gif',
+        'svg'  => 'image/svg+xml',
+        'mp3'  => 'audio/mpeg',
+        'wav'  => 'audio/wav',
+        'mp4'  => 'video/mp4',
+        'pdf'  => 'application/pdf',
+    ];
+    return $map[$ext] ?? 'application/octet-stream';
+}

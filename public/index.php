@@ -362,9 +362,7 @@ if (str_starts_with($uri, '/api/')) {
             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
             if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) continue;
 
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime = finfo_file($finfo, $tmp);
-            finfo_close($finfo);
+            $mime = get_mime_type($name);
             if (!in_array($mime, ['image/png', 'image/jpeg', 'image/webp'], true)) continue;
 
             // Save to storage
@@ -442,9 +440,7 @@ if (str_starts_with($uri, '/api/')) {
 
             if ($img_path) {
                 $data = base64_encode(file_get_contents($img_path));
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                $mime = finfo_file($finfo, $img_path);
-                finfo_close($finfo);
+                $mime = get_mime_type($img_path);
                 $slide_entries[] = ['type' => 'image', 'data' => "data:{$mime};base64,{$data}"];
                 $has_content = true;
             } elseif (!empty($s['html_content'])) {
