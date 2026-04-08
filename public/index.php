@@ -60,6 +60,71 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiGenerateController())->generate_slides((int)$m[1]);
     }
 
+    // Regenerate single slide design (with optional AI prompt)
+    if (preg_match('#^/api/slides/(\d+)/regenerate-design$#', $uri, $m) && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $slide_id = (int)$m[1];
+        $user = current_user();
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        require_once APP_ROOT . '/src/models/SlideModel.php';
+        require_once APP_ROOT . '/src/models/PresentationModel.php';
+        require_once APP_ROOT . '/src/models/UserModel.php';
+        require_once APP_ROOT . '/src/services/SlideGenerationService.php';
+
+        $slideModel = new SlideModel();
+        $presentations = new PresentationModel();
+        $users = new UserModel();
+
+        $slide = $slideModel->find_by_id($slide_id);
+        if (!$slide) json_error('Slide not found', 404);
+
+        $pres = $presentations->find_by_id($slide['presentation_id'], $user['id']);
+        if (!$pres) json_error('Not authorized', 403);
+
+        // Check credits (1 slide = generate_slide cost)
+        $cost = CREDIT_COSTS['generate_slide'];
+        if (!$users->deduct_credits($user['id'], $cost, 'regenerate_slide', $pres['id'])) {
+            json_error("Not enough credits. Need {$cost}.");
+        }
+
+        // Get template config
+        $template_config = ['primary'=>'#1e3a5f','secondary'=>'#ffffff','accent'=>'#3498db','font_heading'=>'Inter','font_body'=>'Inter','style'=>'clean'];
+        if ($pres['template_id']) {
+            $t = get_db()->prepare('SELECT config_json FROM templates WHERE id = ?');
+            $t->execute([$pres['template_id']]);
+            $row = $t->fetch();
+            if ($row) $template_config = json_decode($row['config_json'], true) ?: $template_config;
+        }
+
+        $total_slides = $slideModel->count_by_presentation($pres['id']);
+        $service = new SlideGenerationService();
+
+        // If user provided a custom prompt, modify the slide data
+        $slide_data = $slide;
+        $custom_prompt = trim($input['prompt'] ?? '');
+        if ($custom_prompt !== '') {
+            // Append user's design instruction to the slide content for AI context
+            $slide_data['_design_instruction'] = $custom_prompt;
+        }
+
+        $html = $service->generate_slide_html($slide_data, $template_config, $slide['slide_order'], $total_slides);
+
+        if ($html === null) {
+            json_error('Failed to regenerate design. Try again.');
+        }
+
+        // Save new HTML, clear old image (needs re-render)
+        $slideModel->update($slide_id, ['html_content' => $html, 'image_url' => '']);
+
+        json_success([
+            'html'         => $html,
+            'credits_used' => $cost,
+        ]);
+    }
+
     if (preg_match('#^/api/slides/(\d+)/upload-image$#', $uri, $m) && $method === 'POST') {
         require_once APP_ROOT . '/src/controllers/ApiGenerateController.php';
         (new ApiGenerateController())->upload_slide_image((int)$m[1]);

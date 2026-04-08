@@ -22,6 +22,9 @@
     <style>
         [x-cloak] { display: none !important; }
         @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        /* Live slide preview — scales 1920x1080 to fit card */
+        .slide-live-preview { border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .slide-live-preview * { max-width: none !important; }
         .slide-card { transition: all 0.2s ease; }
         .slide-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
     </style>

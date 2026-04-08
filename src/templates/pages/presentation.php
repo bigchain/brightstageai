@@ -61,19 +61,38 @@
         <?php foreach ($slides as $slide): ?>
         <div class="slide-card bg-white rounded-xl border border-gray-200 overflow-hidden" data-slide-id="<?= $slide['id'] ?>" id="slide-<?= $slide['id'] ?>">
 
-            <!-- Slide Preview -->
-            <?php if (!empty($slide['image_url'])): ?>
+            <!-- Live Slide Preview (Gamma-style) -->
+            <?php if (!empty($slide['html_content'])): ?>
+            <div class="border-b border-gray-200 relative group">
+                <!-- Live HTML render in scaled iframe -->
+                <div class="bg-gray-900 flex justify-center p-3 overflow-hidden" style="max-height: 320px;">
+                    <div class="slide-live-preview" id="live-preview-<?= $slide['id'] ?>"
+                        style="width:1920px;height:1080px;transform:scale(0.28);transform-origin:top center;pointer-events:none;">
+                        <?= $slide['html_content'] ?>
+                    </div>
+                </div>
+                <!-- Overlay actions -->
+                <div class="absolute bottom-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition">
+                    <button onclick="regenerateSlideDesign(<?= $slide['id'] ?>)"
+                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 shadow-lg transition">
+                        &#10024; Regenerate Design
+                    </button>
+                    <button onclick="regenerateWithPrompt(<?= $slide['id'] ?>)"
+                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 shadow-lg transition">
+                        &#9998; Edit with AI
+                    </button>
+                </div>
+                <!-- Hidden img for rendered PNG (used by slideshow/PDF) -->
+                <img id="slide-preview-<?= $slide['id'] ?>" class="hidden"
+                    src="<?= !empty($slide['image_url']) ? e($slide['image_url']) : '' ?>">
+            </div>
+            <?php elseif (!empty($slide['image_url'])): ?>
             <div class="bg-gray-100 p-3 flex justify-center border-b border-gray-200">
                 <img id="slide-preview-<?= $slide['id'] ?>"
                     src="<?= e($slide['image_url']) ?>"
                     alt="Slide <?= $slide['slide_order'] ?> preview"
                     class="rounded-lg shadow-md"
                     style="max-height: 280px; width: auto;">
-            </div>
-            <?php elseif (!empty($slide['html_content'])): ?>
-            <div class="bg-gradient-to-r from-purple-50 to-blue-50 px-6 py-3 border-b border-gray-200 flex items-center justify-between">
-                <span class="text-xs text-purple-600">&#10024; Design ready — click <strong>Render Slides</strong> below to see preview</span>
-                <img id="slide-preview-<?= $slide['id'] ?>" class="hidden rounded-lg shadow-md" style="max-height: 280px;">
             </div>
             <?php endif; ?>
 
@@ -503,6 +522,78 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 // ── Project Management ──
+
+// ── Gamma-style: Regenerate individual slide design ──
+
+async function regenerateSlideDesign(slideId) {
+    toast('Regenerating slide design...', 'info', 2000);
+    const result = await api(`/api/slides/${slideId}/regenerate-design`);
+
+    if (result.success) {
+        // Update live preview
+        const preview = document.getElementById(`live-preview-${slideId}`);
+        if (preview) preview.innerHTML = result.data.html;
+
+        // Update credits
+        const me = await api('/api/auth/me', null, 'GET');
+        if (me.success) updateCreditsDisplay(me.data.credits_balance);
+
+        toast(`Slide redesigned! ${result.data.credits_used} credits used.`, 'success');
+    } else {
+        toast(result.error || 'Failed to regenerate', 'error');
+    }
+}
+
+function regenerateWithPrompt(slideId) {
+    // Show prompt input overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-lg mx-4 w-full" style="animation:fadeInUp 0.2s ease;">
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Edit Slide Design with AI</h3>
+            <p class="text-sm text-gray-500 mb-4">Describe how you want this slide to look different.</p>
+            <textarea id="design-prompt" rows="3" placeholder="e.g., Make it more colorful, add a gradient background, use larger text, make it minimal..."
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none mb-4"></textarea>
+            <div class="flex justify-end space-x-3">
+                <button onclick="this.closest('[style]').remove()" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Cancel</button>
+                <button onclick="submitDesignPrompt(${slideId}, this)" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 transition">
+                    &#10024; Regenerate (${CREDIT_PER_SLIDE} credits)
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById('design-prompt').focus();
+}
+
+async function submitDesignPrompt(slideId, btn) {
+    const prompt = document.getElementById('design-prompt').value.trim();
+    if (!prompt) {
+        toast('Please describe what you want changed', 'warning');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    const result = await api(`/api/slides/${slideId}/regenerate-design`, { prompt });
+
+    // Close overlay
+    btn.closest('[style]').remove();
+
+    if (result.success) {
+        const preview = document.getElementById(`live-preview-${slideId}`);
+        if (preview) preview.innerHTML = result.data.html;
+
+        const me = await api('/api/auth/me', null, 'GET');
+        if (me.success) updateCreditsDisplay(me.data.credits_balance);
+
+        toast('Slide redesigned with your instructions!', 'success');
+    } else {
+        toast(result.error || 'Failed to regenerate', 'error');
+    }
+}
 
 // ── Phase 3: Audio Generation ──
 

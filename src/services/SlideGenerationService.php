@@ -72,8 +72,15 @@ PROMPT;
             . "- Heading font: {$font_heading}\n"
             . "- Body font: {$font_body}\n"
             . "- Style: {$style}\n"
-            . "- Dimensions: 1920x1080px\n\n"
-            . "Return ONLY the HTML div. No explanation, no markdown code fences.";
+            . "- Dimensions: 1920x1080px\n\n";
+
+        // Add custom design instruction if provided
+        $custom = $slide['_design_instruction'] ?? '';
+        if ($custom !== '') {
+            $user_prompt .= "SPECIAL DESIGN INSTRUCTION: {$custom}\n\n";
+        }
+
+        $user_prompt .= "Return ONLY the HTML div. No explanation, no markdown code fences.";
 
         $html = $this->ai->chat($system_prompt, $user_prompt, 0.6, 4096);
 
