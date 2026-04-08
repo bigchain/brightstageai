@@ -12,6 +12,13 @@ require_once __DIR__ . '/../src/config/app.php';
 require_once __DIR__ . '/../src/config/database.php';
 require_once __DIR__ . '/../src/helpers/functions.php';
 
+// Check exec functions are available (cron/CLI should have them, web PHP does not)
+$disabled = explode(',', str_replace(' ', '', ini_get('disable_functions')));
+if (in_array('shell_exec', $disabled, true)) {
+    error_log('BrightStage Video Worker: shell_exec is disabled. This worker must run via cron/CLI, not web.');
+    exit(1);
+}
+
 // Check FFmpeg is available
 $ffmpeg = trim(shell_exec('which ffmpeg 2>/dev/null') ?? '');
 if ($ffmpeg === '') {

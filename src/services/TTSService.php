@@ -186,28 +186,24 @@ class TTSService
             escapeshellarg($mp3_file)
         );
 
-        // Try multiple execution methods (shell_exec may be disabled on shared hosting)
-        $output = null;
-        if (function_exists('exec')) {
-            exec($cmd, $output_lines, $return_code);
-        } elseif (function_exists('shell_exec')) {
-            shell_exec($cmd);
-        } elseif (function_exists('system')) {
-            system($cmd);
-        } elseif (function_exists('passthru')) {
-            passthru($cmd);
-        } else {
-            // No exec functions available — wrap PCM in WAV header instead (no FFmpeg needed)
+        // On shared hosting ALL exec functions are disabled in php.ini
+        // function_exists() returns true but calling them throws fatal error
+        // Check disable_functions instead
+        $disabled = explode(',', str_replace(' ', '', ini_get('disable_functions')));
+        $can_exec = !in_array('exec', $disabled, true) && function_exists('exec');
+
+        if (!$can_exec) {
+            // Pure PHP fallback — WAV header wrapping, no shell needed
             @unlink($pcm_file);
+            @unlink($mp3_file);
             return $this->pcm16_to_wav($pcm_data);
         }
 
+        exec($cmd, $output_lines, $return_code);
         @unlink($pcm_file);
 
         if (!file_exists($mp3_file) || filesize($mp3_file) < 100) {
-            error_log('BrightStage TTS: FFmpeg PCM→MP3 failed. Falling back to WAV.');
             @unlink($mp3_file);
-            // Fallback: wrap raw PCM in a WAV header (works in all browsers, no FFmpeg needed)
             return $this->pcm16_to_wav($pcm_data);
         }
 
