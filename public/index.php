@@ -419,19 +419,48 @@ if (str_starts_with($uri, '/api/')) {
             }
         }
 
-        if (empty($image_urls)) json_error('No rendered slides. Render slides first.');
+        // Build slides — use PNG if available, fall back to HTML content
+        $has_content = false;
+        $slide_entries = [];
+        foreach ($slides as $s) {
+            $img_path = null;
+            if (!empty($s['image_url'])) {
+                $paths = [
+                    APP_ROOT . '/public' . $s['image_url'],
+                    STORAGE_PATH . '/' . ltrim(str_replace('/storage/', '', $s['image_url']), '/'),
+                ];
+                foreach ($paths as $p) {
+                    if (file_exists($p)) { $img_path = $p; break; }
+                }
+            }
 
-        // Generate simple HTML that browsers can print to PDF
+            if ($img_path) {
+                $data = base64_encode(file_get_contents($img_path));
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = finfo_file($finfo, $img_path);
+                finfo_close($finfo);
+                $slide_entries[] = ['type' => 'image', 'data' => "data:{$mime};base64,{$data}"];
+                $has_content = true;
+            } elseif (!empty($s['html_content'])) {
+                $slide_entries[] = ['type' => 'html', 'html' => $s['html_content']];
+                $has_content = true;
+            }
+        }
+
+        if (!$has_content) json_error('No slides to export.');
+
+        // Generate printable HTML
         header('Content-Type: text/html');
         echo '<!DOCTYPE html><html><head><title>' . htmlspecialchars($pres['title']) . '</title>';
-        echo '<style>@page{size:landscape;margin:0}body{margin:0}img{width:100vw;height:100vh;object-fit:contain;page-break-after:always;display:block}</style>';
+        echo '<style>@page{size:landscape;margin:0}body{margin:0}.slide{width:100vw;height:100vh;page-break-after:always;overflow:hidden;position:relative}img.slide-img{width:100%;height:100%;object-fit:contain;display:block}.slide-html{width:1920px;height:1080px;transform-origin:top left;}</style>';
+        echo '<script>window.onload=function(){document.querySelectorAll(".slide-html").forEach(function(el){var s=Math.min(window.innerWidth/1920,window.innerHeight/1080);el.style.transform="scale("+s+")";});}</script>';
         echo '</head><body>';
-        foreach ($image_urls as $path) {
-            $data = base64_encode(file_get_contents($path));
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime = finfo_file($finfo, $path);
-            finfo_close($finfo);
-            echo "<img src=\"data:{$mime};base64,{$data}\">";
+        foreach ($slide_entries as $entry) {
+            if ($entry['type'] === 'image') {
+                echo '<div class="slide"><img class="slide-img" src="' . $entry['data'] . '"></div>';
+            } else {
+                echo '<div class="slide"><div class="slide-html">' . $entry['html'] . '</div></div>';
+            }
         }
         echo '</body></html>';
         exit;

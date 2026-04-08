@@ -1428,12 +1428,13 @@ async function duplicatePresentation() {
 function openSlideshow() {
     const slidesForShow = SLIDES_DATA.map(s => ({
         image_url: s.image_url || null,
+        html_content: s.html_content || null,
         title: s.title || `Slide ${s.slide_order}`,
         slide_order: s.slide_order,
-    })).filter(s => s.image_url);
+    }));
 
-    if (slidesForShow.length === 0) {
-        toast('No rendered slides yet. Click "Render Previews" in the pipeline below.', 'warning');
+    if (slidesForShow.filter(s => s.image_url || s.html_content).length === 0) {
+        toast('No slides to preview. Design your slides first.', 'warning');
         return;
     }
     Slideshow.open(slidesForShow);
@@ -1479,9 +1480,9 @@ async function uploadSlides(files) {
 // ── Download PDF ──
 
 function downloadPDF() {
-    const hasImages = SLIDES_DATA.some(s => s.image_url);
-    if (!hasImages) {
-        toast('No rendered slides yet. Render your slides first.', 'warning');
+    const hasContent = SLIDES_DATA.some(s => s.image_url || s.html_content);
+    if (!hasContent) {
+        toast('No slides to export. Design your slides first.', 'warning');
         return;
     }
     window.open(`/api/presentations/${PRESENTATION_ID}/download-pdf`, '_blank');
