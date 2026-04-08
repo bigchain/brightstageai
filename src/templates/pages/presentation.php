@@ -161,6 +161,9 @@
                         <?php if (!empty($slide['image_url'])): ?>
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700">rendered</span>
                         <?php endif; ?>
+                        <?php if (!empty($slide['audio_url'])): ?>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">audio</span>
+                        <?php endif; ?>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button onclick="saveSlide(<?= $slide['id'] ?>)" class="text-xs text-brand-600 hover:text-brand-700 font-medium px-2 py-1 rounded hover:bg-brand-50 transition save-btn" data-slide-id="<?= $slide['id'] ?>" style="display:none;">
@@ -171,6 +174,21 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Audio Player (if audio exists) -->
+                <?php if (!empty($slide['audio_url'])): ?>
+                <div class="mb-4 flex items-center space-x-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <audio id="audio-<?= $slide['id'] ?>" src="<?= e($slide['audio_url']) ?>" preload="none"></audio>
+                    <button onclick="toggleAudio(<?= $slide['id'] ?>)" id="audio-btn-<?= $slide['id'] ?>"
+                        class="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm hover:bg-amber-600 transition flex-shrink-0">
+                        &#9654;
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-medium text-amber-800">Narration audio</div>
+                        <div class="text-xs text-amber-600">Click to preview</div>
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Title -->
                 <div class="mb-4">
@@ -282,16 +300,24 @@
                 </button>
                 <?php endif; ?>
 
-                <!-- Step 3: Audio -->
+                <!-- Step 3: Audio with voice selector -->
                 <?php if ($has_images): ?>
-                <button onclick="generateAudio()" id="btn-generate-audio"
-                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_audio ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50 ring-2 ring-amber-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
-                    <span class="text-2xl mb-2"><?= $has_audio ? '&#10003;' : '&#127908;' ?></span>
-                    <span class="text-xs font-semibold <?= $has_audio ? 'text-green-700' : 'text-amber-700' ?>">
+                <div class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_audio ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50 ring-2 ring-amber-200' ?> text-center">
+                    <span class="text-2xl mb-1"><?= $has_audio ? '&#10003;' : '&#127908;' ?></span>
+                    <select id="voice-selector" class="text-xs border border-gray-300 rounded px-1.5 py-1 mb-2 bg-white">
+                        <option value="alloy">Alloy (neutral)</option>
+                        <option value="nova">Nova (female)</option>
+                        <option value="echo">Echo (male)</option>
+                        <option value="shimmer">Shimmer (soft)</option>
+                        <option value="onyx">Onyx (deep)</option>
+                        <option value="fable">Fable (warm)</option>
+                    </select>
+                    <button onclick="generateAudio()" id="btn-generate-audio"
+                        class="text-xs font-semibold <?= $has_audio ? 'text-green-700' : 'text-amber-700' ?> hover:underline disabled:opacity-50">
                         <?= $has_audio ? 'Regenerate Audio' : 'Generate Audio' ?>
-                    </span>
-                    <span class="text-xs text-gray-400 mt-1"><?= count($slides) * CREDIT_COSTS['generate_audio'] ?> credits</span>
-                </button>
+                    </button>
+                    <span class="text-xs text-gray-400 mt-0.5"><?= count($slides) * CREDIT_COSTS['generate_audio'] ?> credits</span>
+                </div>
                 <?php else: ?>
                 <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
                     <span class="text-2xl mb-2">&#127908;</span>
@@ -329,6 +355,35 @@
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Video Player (if video exists) -->
+        <?php if ($has_video && !empty($video['file_url'])): ?>
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">Your Video</p>
+                <div class="flex items-center space-x-3">
+                    <?php if ($video['duration_seconds']): ?>
+                    <span class="text-xs text-gray-500"><?= gmdate('i:s', $video['duration_seconds']) ?></span>
+                    <?php endif; ?>
+                    <a href="<?= e($video['file_url']) ?>" download class="inline-flex items-center px-4 py-2 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 transition">
+                        Download MP4
+                    </a>
+                </div>
+            </div>
+            <div class="rounded-xl overflow-hidden bg-black" style="aspect-ratio:16/9;">
+                <video controls class="w-full h-full" preload="metadata">
+                    <source src="<?= e($video['file_url']) ?>" type="video/mp4">
+                    Your browser does not support video playback.
+                </video>
+            </div>
+        </div>
+        <?php elseif ($video && $video['status'] === 'processing'): ?>
+        <div class="bg-white rounded-xl border border-amber-200 p-6 text-center">
+            <div class="animate-spin w-8 h-8 border-4 border-amber-200 border-t-amber-600 rounded-full mx-auto mb-3"></div>
+            <p class="text-sm font-medium text-amber-700">Video is being assembled...</p>
+            <p class="text-xs text-amber-500 mt-1"><?= e($video['progress_message'] ?? 'Processing') ?></p>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
@@ -985,15 +1040,26 @@ async function saveSlideEdit(slideId) {
 // ── Gamma-style: Regenerate individual slide design ──
 
 async function regenerateSlideDesign(slideId) {
-    toast('Regenerating slide design...', 'info', 2000);
+    // Show loading overlay on the slide
+    const wrapper = document.querySelector(`#slide-${slideId} .slide-preview-wrapper`);
+    let loadingEl = null;
+    if (wrapper) {
+        loadingEl = document.createElement('div');
+        loadingEl.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20;border-radius:12px;';
+        loadingEl.innerHTML = '<div style="text-align:center;"><div class="animate-spin" style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;margin:0 auto 12px;"></div><div style="color:#fff;font-size:13px;font-weight:500;">Regenerating design...</div></div>';
+        wrapper.style.position = 'relative';
+        wrapper.appendChild(loadingEl);
+    }
+
     const result = await api(`/api/slides/${slideId}/regenerate-design`);
 
+    // Remove loading overlay
+    if (loadingEl) loadingEl.remove();
+
     if (result.success) {
-        // Update live preview
         const preview = document.getElementById(`live-preview-${slideId}`);
         if (preview) { preview.innerHTML = result.data.html; scaleSlidePreviews(); }
 
-        // Update credits
         const me = await api('/api/auth/me', null, 'GET');
         if (me.success) updateCreditsDisplay(me.data.credits_balance);
 
@@ -1056,10 +1122,34 @@ async function submitDesignPrompt(slideId, btn) {
 
 // ── Phase 3: Audio Generation ──
 
+// ── Audio Playback ──
+
+function toggleAudio(slideId) {
+    const audio = document.getElementById(`audio-${slideId}`);
+    const btn = document.getElementById(`audio-btn-${slideId}`);
+    if (!audio) return;
+
+    // Stop all other audio first
+    document.querySelectorAll('audio').forEach(a => {
+        if (a.id !== `audio-${slideId}`) { a.pause(); a.currentTime = 0; }
+    });
+    document.querySelectorAll('[id^="audio-btn-"]').forEach(b => b.innerHTML = '&#9654;');
+
+    if (audio.paused) {
+        audio.play();
+        btn.innerHTML = '&#9646;&#9646;';
+        audio.onended = () => { btn.innerHTML = '&#9654;'; };
+    } else {
+        audio.pause();
+        btn.innerHTML = '&#9654;';
+    }
+}
+
 async function generateAudio() {
     const btn = document.getElementById('btn-generate-audio');
     btn.disabled = true;
 
+    const voice = document.getElementById('voice-selector')?.value || 'alloy';
     const audioCost = SLIDE_COUNT * <?= CREDIT_COSTS['generate_audio'] ?>;
     showPipelineProgress('Generating narration audio...', `0 of ${SLIDE_COUNT} slides`, 5, 0);
 
@@ -1072,7 +1162,7 @@ async function generateAudio() {
         }
     }, 3000);
 
-    const result = await api(`/api/generate/audio/${PRESENTATION_ID}`, { voice: 'alloy' });
+    const result = await api(`/api/generate/audio/${PRESENTATION_ID}`, { voice });
     clearInterval(interval);
 
     if (result.success) {
