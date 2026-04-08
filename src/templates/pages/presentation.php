@@ -249,7 +249,7 @@ async function saveSlide(slideId) {
             setTimeout(() => { btn.style.display = 'none'; btn.textContent = 'Save Changes'; btn.disabled = false; }, 1500);
         }
     } else {
-        alert(result.error || 'Failed to save');
+        toast(result.error || 'Failed to save', 'error');
         if (btn) { btn.textContent = 'Save Changes'; btn.disabled = false; }
     }
 }
@@ -267,14 +267,19 @@ async function addSlide() {
         layout_type: 'bullets',
     });
     if (result.success) location.reload();
-    else alert(result.error || 'Failed to add slide');
+    else toast(result.error || 'Failed to add slide', 'error');
 }
 
-async function deleteSlide(slideId) {
-    if (!confirm('Delete this slide?')) return;
-    const result = await api(`/api/slides/${slideId}/delete`);
-    if (result.success) document.getElementById(`slide-${slideId}`).remove();
-    else alert(result.error || 'Failed to delete');
+function deleteSlide(slideId) {
+    confirmAction('Delete this slide?', async () => {
+        const result = await api(`/api/slides/${slideId}/delete`);
+        if (result.success) {
+            document.getElementById(`slide-${slideId}`).remove();
+            toast('Slide removed', 'success');
+        } else {
+            toast(result.error || 'Failed to delete', 'error');
+        }
+    });
 }
 
 // ── Phase 2: AI Slide Design Generation ──
@@ -306,7 +311,7 @@ async function generateSlideDesigns() {
         showProgress(`${result.data.success_count} slides designed! Reloading...`, 100);
         setTimeout(() => location.reload(), 1500);
     } else {
-        alert(result.error || 'Failed to generate slides');
+        toast(result.error || 'Failed to generate slides', 'error');
         btn.disabled = false;
         btn.innerHTML = '&#10024; Design Slides';
         hideProgress();
@@ -320,7 +325,7 @@ async function renderAllSlides() {
 
     const slidesWithHtml = SLIDES_DATA.filter(s => s.html_content);
     if (slidesWithHtml.length === 0) {
-        alert('No slides have been designed yet. Click "Design Slides" first.');
+        toast('No slides designed yet. Click "Design Slides" first.', 'warning');
         btn.disabled = false;
         return;
     }
@@ -352,17 +357,22 @@ window.addEventListener('beforeunload', (e) => {
 
 // ── Project Management ──
 
-async function deletePresentation() {
-    if (!confirm('Delete this presentation and all its slides? This cannot be undone.')) return;
-    const result = await api(`/api/presentations/${PRESENTATION_ID}`, { _action: 'delete' });
-    if (result.success) window.location.href = '/dashboard';
-    else alert(result.error || 'Failed to delete');
+function deletePresentation() {
+    confirmAction('Delete this presentation and all its slides? This cannot be undone.', async () => {
+        const result = await api(`/api/presentations/${PRESENTATION_ID}`, { _action: 'delete' });
+        if (result.success) {
+            toast('Deleted. Redirecting...', 'success');
+            setTimeout(() => window.location.href = '/dashboard', 800);
+        } else {
+            toast(result.error || 'Failed to delete', 'error');
+        }
+    });
 }
 
 async function duplicatePresentation() {
     const result = await api(`/api/presentations/${PRESENTATION_ID}`, { _action: 'duplicate' });
     if (result.success) window.location.href = result.data.redirect;
-    else alert(result.error || 'Failed to duplicate');
+    else toast(result.error || 'Failed to duplicate', 'error');
 }
 
 // ── Slideshow Preview ──
@@ -375,7 +385,7 @@ function openSlideshow() {
     })).filter(s => s.image_url);
 
     if (slidesForShow.length === 0) {
-        alert('No rendered slide images yet. Render your slides first.');
+        toast('No rendered slides yet. Click "Render Previews" in the pipeline below.', 'warning');
         return;
     }
     Slideshow.open(slidesForShow);
@@ -407,11 +417,11 @@ async function uploadSlides(files) {
             setTimeout(() => location.reload(), 1000);
         } else {
             hideProgress();
-            alert(result.error || 'Upload failed');
+            toast(result.error || 'Upload failed', 'error');
         }
     } catch (err) {
         hideProgress();
-        alert('Upload failed. Check your connection.');
+        toast('Upload failed. Check your connection.', 'error');
     }
 
     // Reset file input
@@ -423,7 +433,7 @@ async function uploadSlides(files) {
 function downloadPDF() {
     const hasImages = SLIDES_DATA.some(s => s.image_url);
     if (!hasImages) {
-        alert('No rendered slides yet. Render your slides first.');
+        toast('No rendered slides yet. Render your slides first.', 'warning');
         return;
     }
     window.open(`/api/presentations/${PRESENTATION_ID}/download-pdf`, '_blank');

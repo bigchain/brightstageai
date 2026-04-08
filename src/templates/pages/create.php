@@ -303,7 +303,7 @@ async function enhanceTopic() {
 
     if (!enhanced.success) {
         isBusy = false;
-        alert(enhanced.error || 'Failed to enhance. Try again.');
+        toast(enhanced.error || 'Failed to enhance. Try again.', 'error');
         return;
     }
 
@@ -338,7 +338,7 @@ async function generateOutline() {
     const audience = document.getElementById('gen-audience').value.trim();
 
     if (!topic) {
-        alert('Please click AI Enhance first to generate a description.');
+        toast('Click AI Enhance first to generate your description.', 'warning');
         btn.disabled = false;
         return;
     }
@@ -357,7 +357,7 @@ async function generateOutline() {
 
     if (!outline.success) {
         isBusy = false;
-        alert(outline.error || 'Failed to generate outline. Try again.');
+        toast(outline.error || 'Failed to generate outline. Try again.', 'error');
         return;
     }
 
@@ -464,7 +464,7 @@ function addNewSlide() {
 
 function removeSlide(index) {
     if (!outlineData || outlineData.slides.length <= 2) {
-        alert('You need at least 2 slides.');
+        toast('You need at least 2 slides.', 'warning');
         return;
     }
 
@@ -519,7 +519,7 @@ async function polishSlide(index) {
         newCard.classList.add('ring-2', 'ring-green-400');
         setTimeout(() => newCard.classList.remove('ring-2', 'ring-green-400'), 2000);
     } else {
-        alert(result.error || 'Polish failed. Try again.');
+        toast(result.error || 'Polish failed. Try again.', 'error');
     }
 }
 
@@ -650,7 +650,7 @@ async function savePresentation() {
         window.location.href = result.data.redirect;
     } else {
         btn.disabled = false;
-        alert(result.error || 'Failed to create presentation');
+        toast(result.error || 'Failed to create presentation', 'error');
     }
 }
 

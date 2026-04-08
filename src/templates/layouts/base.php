@@ -21,6 +21,7 @@
     </script>
     <style>
         [x-cloak] { display: none !important; }
+        @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         .slide-card { transition: all 0.2s ease; }
         .slide-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
     </style>
@@ -93,10 +94,78 @@
         </div>
     </footer>
 
+    <!-- Toast Container -->
+    <div id="toast-container" style="position:fixed;top:20px;right:20px;z-index:9998;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
+
     <!-- Global JS -->
     <script>
         // CSRF token for AJAX requests
         const CSRF_TOKEN = '<?= e(csrf_token()) ?>';
+
+        // ── Toast Notification System ──
+        function toast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toast-container');
+            const colors = {
+                success: 'bg-green-600',
+                error:   'bg-red-600',
+                warning: 'bg-amber-500',
+                info:    'bg-brand-600',
+            };
+            const icons = {
+                success: '&#10003;',
+                error:   '&#10007;',
+                warning: '&#9888;',
+                info:    '&#8505;',
+            };
+
+            const el = document.createElement('div');
+            el.style.cssText = 'pointer-events:auto;transform:translateX(120%);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);';
+            el.innerHTML = `
+                <div class="${colors[type] || colors.info} text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 min-w-[300px] max-w-[420px]" style="backdrop-filter:blur(10px);">
+                    <span class="text-lg flex-shrink-0">${icons[type] || icons.info}</span>
+                    <span class="text-sm font-medium flex-1">${message}</span>
+                    <button onclick="this.closest('[style]').remove()" class="text-white/60 hover:text-white text-lg ml-2 flex-shrink-0">&times;</button>
+                </div>
+            `;
+            container.appendChild(el);
+
+            // Slide in
+            requestAnimationFrame(() => {
+                el.style.transform = 'translateX(0)';
+            });
+
+            // Auto dismiss
+            if (duration > 0) {
+                setTimeout(() => {
+                    el.style.transform = 'translateX(120%)';
+                    el.style.opacity = '0';
+                    setTimeout(() => el.remove(), 300);
+                }, duration);
+            }
+        }
+
+        // ── Confirmation Dialog (replaces confirm()) ──
+        function confirmAction(message, onConfirm) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4" style="animation:fadeInUp 0.2s ease;">
+                    <p class="text-gray-900 font-medium mb-6">${message}</p>
+                    <div class="flex justify-end space-x-3">
+                        <button onclick="this.closest('[style]').remove()" class="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Cancel</button>
+                        <button id="confirm-yes" class="px-5 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition">Delete</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#confirm-yes').onclick = () => {
+                overlay.remove();
+                onConfirm();
+            };
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+        }
 
         // Helper: make API calls with error handling
         async function api(url, data = null, method = 'POST') {
@@ -110,9 +179,16 @@
                 };
                 if (data) opts.body = JSON.stringify(data);
                 const res = await fetch(url, opts);
-                return await res.json();
+                const json = await res.json();
+                if (res.status === 401) {
+                    toast('Session expired. Redirecting to login...', 'warning');
+                    setTimeout(() => window.location.href = '/login', 1500);
+                    return json;
+                }
+                return json;
             } catch (err) {
-                return { success: false, error: 'Network error. Please check your connection and try again.' };
+                toast('Network error. Check your connection.', 'error');
+                return { success: false, error: 'Network error' };
             }
         }
 

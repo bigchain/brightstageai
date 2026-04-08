@@ -17,10 +17,9 @@
             <div>
                 <p class="text-brand-200 text-sm">Available Credits</p>
                 <p class="text-3xl font-bold mt-1"><?= e($user['credits_balance']) ?></p>
-                <p class="text-brand-200 text-xs mt-1">Plan: <?= ucfirst(e($user['plan'])) ?></p>
+                <p class="text-brand-200 text-xs mt-1">Plan: <?= ucfirst(e($user['plan'])) ?> &middot; A full presentation uses ~80-110 credits</p>
             </div>
             <div class="text-right">
-                <p class="text-brand-200 text-sm mb-2">A full presentation costs ~80-110 credits</p>
                 <a href="/billing" class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-white text-brand-700 hover:bg-brand-50 transition">
                     Get More Credits
                 </a>
@@ -33,7 +32,7 @@
     <div class="bg-white rounded-xl border border-gray-200 p-16 text-center">
         <div class="text-5xl mb-4">&#127916;</div>
         <h3 class="text-lg font-semibold text-gray-900 mb-2">No presentations yet</h3>
-        <p class="text-gray-500 mb-6">Create your first AI-powered video presentation in minutes.</p>
+        <p class="text-gray-500 mb-6">Create your first AI-powered video presentation — it takes about 2 minutes.</p>
         <a href="/create" class="inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium text-white bg-brand-600 hover:bg-brand-700">
             Create Your First Presentation
         </a>
@@ -90,35 +89,40 @@
 </div>
 
 <script>
-async function deleteProject(id, title) {
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-
-    const result = await api(`/api/presentations/${id}`, { _action: 'delete' });
-    if (result.success) {
-        document.querySelector(`[data-pres-id="${id}"]`).remove();
-    } else {
-        alert(result.error || 'Failed to delete');
-    }
+function deleteProject(id, title) {
+    confirmAction(`Delete "${title}"? This removes all slides and cannot be undone.`, async () => {
+        const result = await api(`/api/presentations/${id}`, { _action: 'delete' });
+        if (result.success) {
+            document.querySelector(`[data-pres-id="${id}"]`).remove();
+            toast('Presentation deleted', 'success');
+        } else {
+            toast(result.error || 'Failed to delete', 'error');
+        }
+    });
 }
 
 async function duplicateProject(id) {
+    toast('Duplicating...', 'info', 2000);
     const result = await api(`/api/presentations/${id}`, { _action: 'duplicate' });
     if (result.success) {
-        window.location.href = result.data.redirect;
+        toast('Duplicated! Redirecting...', 'success');
+        setTimeout(() => window.location.href = result.data.redirect, 800);
     } else {
-        alert(result.error || 'Failed to duplicate');
+        toast(result.error || 'Failed to duplicate', 'error');
     }
 }
 
-async function renameProject(id, currentTitle) {
+function renameProject(id, currentTitle) {
     const newTitle = prompt('New title:', currentTitle);
     if (!newTitle || newTitle === currentTitle) return;
 
-    const result = await api(`/api/presentations/${id}`, { title: newTitle });
-    if (result.success) {
-        location.reload();
-    } else {
-        alert(result.error || 'Failed to rename');
-    }
+    api(`/api/presentations/${id}`, { title: newTitle }).then(result => {
+        if (result.success) {
+            toast('Renamed!', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            toast(result.error || 'Failed to rename', 'error');
+        }
+    });
 }
 </script>
