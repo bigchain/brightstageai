@@ -1,31 +1,22 @@
 <?php
 /**
- * Text-to-Speech service.
- * Converts slide narration scripts to MP3 audio files.
- * Supports OpenAI TTS and ElevenLabs.
+ * Text-to-Speech service via OpenRouter.
+ * Uses OpenRouter's audio-capable models (gpt-4o-audio-preview)
+ * to generate MP3 narration from slide speaker notes.
+ * No extra API key needed — uses the same OPENROUTER_API_KEY.
  */
 
 class TTSService
 {
-    private string $provider;
     private string $api_key;
+    private string $base_url;
+    private string $model;
 
     public function __construct()
     {
-        // Check which TTS provider is configured
-        $openai_key = env('OPENAI_API_KEY', '');
-        $elevenlabs_key = env('ELEVENLABS_API_KEY', '');
-
-        if ($openai_key !== '') {
-            $this->provider = 'openai';
-            $this->api_key = $openai_key;
-        } elseif ($elevenlabs_key !== '') {
-            $this->provider = 'elevenlabs';
-            $this->api_key = $elevenlabs_key;
-        } else {
-            $this->provider = 'none';
-            $this->api_key = '';
-        }
+        $this->api_key = env('OPENROUTER_API_KEY', '');
+        $this->base_url = OPENROUTER_BASE_URL;
+        $this->model = 'openai/gpt-4o-mini-audio-preview'; // Cheapest audio model
     }
 
     /**
@@ -33,7 +24,7 @@ class TTSService
      */
     public function is_available(): bool
     {
-        return $this->provider !== 'none';
+        return $this->api_key !== '';
     }
 
     /**
@@ -43,31 +34,38 @@ class TTSService
     public function generate(string $text, string $voice = 'alloy'): ?string
     {
         if (!$this->is_available()) {
-            error_log('BrightStage TTS: No TTS provider configured (set OPENAI_API_KEY or ELEVENLABS_API_KEY in .env)');
+            error_log('BrightStage TTS: OPENROUTER_API_KEY not configured');
             return null;
         }
 
-        // Trim and validate
         $text = trim($text);
         if ($text === '' || mb_strlen($text) < 5) {
             return null;
         }
 
-        // OpenAI TTS has 4096 char limit per request — split if needed
-        if ($this->provider === 'openai') {
-            return $this->generate_openai($text, $voice);
+        // Split long text into chunks if needed (4000 char safety limit)
+        $chunks = $this->split_text($text, 4000);
+        $audio_parts = [];
+
+        foreach ($chunks as $chunk) {
+            $audio = $this->call_audio_api($chunk, $voice);
+            if ($audio === null) {
+                return null;
+            }
+            $audio_parts[] = $audio;
         }
 
-        if ($this->provider === 'elevenlabs') {
-            return $this->generate_elevenlabs($text, $voice);
+        // Single chunk — return directly
+        if (count($audio_parts) === 1) {
+            return $audio_parts[0];
         }
 
-        return null;
+        // Multiple chunks — concatenate MP3 data
+        return implode('', $audio_parts);
     }
 
     /**
      * Generate audio for all slides in a presentation.
-     * Saves MP3 files to storage and returns results.
      */
     public function generate_for_slides(array $slides, int $user_id, int $presentation_id, string $voice = 'alloy'): array
     {
@@ -91,7 +89,6 @@ class TTSService
                 continue;
             }
 
-            // Save MP3 file
             $filename = "slide_{$slide['slide_order']}.mp3";
             $filepath = $storage_path . '/' . $filename;
             file_put_contents($filepath, $audio_data);
@@ -110,111 +107,77 @@ class TTSService
     }
 
     /**
-     * OpenAI TTS API.
-     * Model: tts-1 (fast) or tts-1-hd (high quality)
-     * Voices: alloy, echo, fable, onyx, nova, shimmer
+     * Call OpenRouter audio API.
+     * Uses gpt-4o-mini-audio-preview with audio modality.
      */
-    private function generate_openai(string $text, string $voice): ?string
+    private function call_audio_api(string $text, string $voice): ?string
     {
-        // Split long text into chunks (OpenAI limit: 4096 chars)
-        $chunks = $this->split_text($text, 4000);
-        $audio_parts = [];
-
-        foreach ($chunks as $chunk) {
-            $payload = [
-                'model' => 'tts-1',
-                'input' => $chunk,
-                'voice' => $voice,
-                'response_format' => 'mp3',
-            ];
-
-            $ch = curl_init('https://api.openai.com/v1/audio/speech');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode($payload),
-                CURLOPT_HTTPHEADER     => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $this->api_key,
-                ],
-                CURLOPT_TIMEOUT        => 60,
-                CURLOPT_CONNECTTIMEOUT => 10,
-            ]);
-
-            $body = curl_exec($ch);
-            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
-
-            if ($error || $http_code >= 400) {
-                error_log("BrightStage TTS OpenAI error: HTTP {$http_code}");
-                return null;
-            }
-
-            $audio_parts[] = $body;
-        }
-
-        // If single chunk, return directly
-        if (count($audio_parts) === 1) {
-            return $audio_parts[0];
-        }
-
-        // Multiple chunks — concatenate MP3 data (simple append works for MP3)
-        return implode('', $audio_parts);
-    }
-
-    /**
-     * ElevenLabs TTS API.
-     */
-    private function generate_elevenlabs(string $text, string $voice): ?string
-    {
-        // Default ElevenLabs voice ID (Rachel)
-        $voice_id = ' 21m00Tcm4TlvDq8ikWAM';
-
-        $voice_map = [
-            'alloy'   => '21m00Tcm4TlvDq8ikWAM', // Rachel
-            'echo'    => 'AZnzlk1XvdvUeBnXmlld', // Domi
-            'nova'    => 'EXAVITQu4vr4xnSDxMaL', // Bella
-            'onyx'    => 'VR6AewLTigWG4xSOukaG', // Arnold
-            'shimmer' => 'pNInz6obpgDQGcFmaJgB', // Adam
-        ];
-
-        if (isset($voice_map[$voice])) {
-            $voice_id = $voice_map[$voice];
-        }
-
         $payload = [
-            'text' => $text,
-            'model_id' => 'eleven_monolingual_v1',
-            'voice_settings' => [
-                'stability' => 0.5,
-                'similarity_boost' => 0.75,
+            'model'      => $this->model,
+            'modalities' => ['text', 'audio'],
+            'audio'      => [
+                'voice'  => $voice,
+                'format' => 'mp3',
+            ],
+            'messages'   => [
+                [
+                    'role'    => 'system',
+                    'content' => 'You are a professional presentation narrator. Read the following text aloud exactly as written. Do not add any commentary, introduction, or extra words. Just read the text naturally and clearly as a voiceover narration.',
+                ],
+                [
+                    'role'    => 'user',
+                    'content' => 'Read this aloud as a presentation voiceover: ' . $text,
+                ],
             ],
         ];
 
-        $ch = curl_init("https://api.elevenlabs.io/v1/text-to-speech/{$voice_id}");
+        $ch = curl_init($this->base_url . '/chat/completions');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
             CURLOPT_POSTFIELDS     => json_encode($payload),
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
-                'xi-api-key: ' . $this->api_key,
-                'Accept: audio/mpeg',
+                'Authorization: Bearer ' . $this->api_key,
+                'HTTP-Referer: ' . APP_URL,
+                'X-Title: BrightStage Video',
             ],
-            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_TIMEOUT        => 90,
+            CURLOPT_CONNECTTIMEOUT => 10,
         ]);
 
         $body = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
         curl_close($ch);
 
-        if ($http_code >= 400) {
-            error_log("BrightStage TTS ElevenLabs error: HTTP {$http_code}");
+        if ($error || $http_code >= 400) {
+            error_log("BrightStage TTS: OpenRouter audio error HTTP {$http_code}");
             return null;
         }
 
-        return $body;
+        $response = json_decode($body, true);
+
+        if (!$response || !isset($response['choices'][0]['message'])) {
+            error_log('BrightStage TTS: Invalid response structure');
+            return null;
+        }
+
+        $message = $response['choices'][0]['message'];
+
+        // Audio data is in message.audio.data as base64
+        if (isset($message['audio']['data'])) {
+            $audio_base64 = $message['audio']['data'];
+            $audio_binary = base64_decode($audio_base64);
+            if ($audio_binary === false) {
+                error_log('BrightStage TTS: Failed to decode audio base64');
+                return null;
+            }
+            return $audio_binary;
+        }
+
+        error_log('BrightStage TTS: No audio data in response');
+        return null;
     }
 
     /**
@@ -232,18 +195,14 @@ class TTSService
 
         foreach ($sentences as $sentence) {
             if (mb_strlen($current . ' ' . $sentence) > $max_chars) {
-                if ($current !== '') {
-                    $chunks[] = trim($current);
-                }
+                if ($current !== '') $chunks[] = trim($current);
                 $current = $sentence;
             } else {
                 $current .= ($current !== '' ? ' ' : '') . $sentence;
             }
         }
 
-        if ($current !== '') {
-            $chunks[] = trim($current);
-        }
+        if ($current !== '') $chunks[] = trim($current);
 
         return $chunks;
     }
