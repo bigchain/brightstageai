@@ -92,14 +92,38 @@
                 </div>
                 <!-- Overlay actions -->
                 <div class="absolute bottom-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button onclick="toggleSlideEdit(<?= $slide['id'] ?>)" id="edit-toggle-<?= $slide['id'] ?>"
+                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-700 hover:bg-gray-800 shadow-lg transition">
+                        &#9998; Edit Text
+                    </button>
+                    <button onclick="document.getElementById('slide-upload-<?= $slide['id'] ?>').click()"
+                        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-700 hover:bg-gray-800 shadow-lg transition">
+                        &#128228; Replace Image
+                    </button>
                     <button onclick="regenerateSlideDesign(<?= $slide['id'] ?>)"
                         class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 shadow-lg transition">
-                        &#10024; Regenerate Design
+                        &#10024; Regenerate
                     </button>
                     <button onclick="regenerateWithPrompt(<?= $slide['id'] ?>)"
                         class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 shadow-lg transition">
-                        &#9998; Edit with AI
+                        &#10024; AI Edit
                     </button>
+                </div>
+                <!-- Per-slide upload (replace this slide's image) -->
+                <input type="file" id="slide-upload-<?= $slide['id'] ?>" accept="image/png,image/jpeg,image/webp" class="hidden"
+                    onchange="uploadSingleSlide(<?= $slide['id'] ?>, this.files[0])">
+
+                <!-- Save bar (shown during manual edit) -->
+                <div id="edit-bar-<?= $slide['id'] ?>" class="hidden absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+                    <span class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-amber-500 shadow-lg">
+                        Editing — click text on the slide to change it
+                    </span>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="cancelSlideEdit(<?= $slide['id'] ?>)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gray-600 hover:bg-gray-700 shadow-lg transition">Cancel</button>
+                        <button onclick="saveSlideEdit(<?= $slide['id'] ?>)"
+                            class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 shadow-lg transition">Save Changes</button>
+                    </div>
                 </div>
                 <!-- Hidden img for rendered PNG -->
                 <img id="slide-preview-<?= $slide['id'] ?>" class="hidden"
@@ -675,6 +699,164 @@ function initDragReorder() {
 
 // Init on page load
 document.addEventListener('DOMContentLoaded', initDragReorder);
+
+// ── Upload/Replace Single Slide Image ──
+
+async function uploadSingleSlide(slideId, file) {
+    if (!file) return;
+
+    // Validate
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+        toast('Please upload a PNG, JPG, or WebP image', 'warning');
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        toast('Image must be under 10MB', 'warning');
+        return;
+    }
+
+    toast('Uploading slide image...', 'info', 2000);
+
+    // Convert to base64 and upload
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const result = await api(`/api/slides/${slideId}/upload-image`, {
+            image_data: e.target.result,
+        });
+
+        if (result.success) {
+            // Update the preview with the uploaded image
+            const wrapper = document.querySelector(`#slide-${slideId} .slide-preview-wrapper`);
+            if (wrapper) {
+                wrapper.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;">`;
+            }
+            toast('Slide image replaced!', 'success');
+        } else {
+            toast(result.error || 'Upload failed', 'error');
+        }
+    };
+    reader.readAsDataURL(file);
+
+    // Reset file input
+    document.getElementById(`slide-upload-${slideId}`).value = '';
+}
+
+// ── Inline Slide Editing (WYSIWYG) ──
+
+const editBackups = {}; // Store original HTML before editing
+
+function toggleSlideEdit(slideId) {
+    const preview = document.getElementById(`live-preview-${slideId}`);
+    const editBar = document.getElementById(`edit-bar-${slideId}`);
+    const toggleBtn = document.getElementById(`edit-toggle-${slideId}`);
+    if (!preview) return;
+
+    const isEditing = preview.style.pointerEvents === 'auto';
+
+    if (isEditing) {
+        // Exit edit mode
+        cancelSlideEdit(slideId);
+    } else {
+        // Enter edit mode — backup HTML, make text editable
+        editBackups[slideId] = preview.innerHTML;
+
+        // Enable pointer events on the scaled slide
+        preview.style.pointerEvents = 'auto';
+        preview.style.cursor = 'text';
+
+        // Make all text elements contenteditable
+        preview.querySelectorAll('h1,h2,h3,h4,h5,h6,p,span,li,div').forEach(el => {
+            // Only make leaf text nodes editable (not containers with children that are also text)
+            if (el.children.length === 0 || el.innerText.trim().length > 0) {
+                el.contentEditable = 'true';
+                el.style.outline = 'none';
+                el.addEventListener('focus', function() {
+                    this.style.outline = '2px solid rgba(59,130,246,0.5)';
+                    this.style.outlineOffset = '2px';
+                    this.style.borderRadius = '4px';
+                });
+                el.addEventListener('blur', function() {
+                    this.style.outline = 'none';
+                });
+            }
+        });
+
+        // Show save bar, update button
+        editBar.classList.remove('hidden');
+        toggleBtn.innerHTML = '&#10005; Exit Edit';
+        toggleBtn.classList.replace('bg-gray-700', 'bg-amber-600');
+
+        toast('Click any text on the slide to edit it directly', 'info', 3000);
+    }
+}
+
+function cancelSlideEdit(slideId) {
+    const preview = document.getElementById(`live-preview-${slideId}`);
+    const editBar = document.getElementById(`edit-bar-${slideId}`);
+    const toggleBtn = document.getElementById(`edit-toggle-${slideId}`);
+    if (!preview) return;
+
+    // Restore original HTML
+    if (editBackups[slideId]) {
+        preview.innerHTML = editBackups[slideId];
+        delete editBackups[slideId];
+    }
+
+    // Disable editing
+    preview.style.pointerEvents = 'none';
+    preview.style.cursor = 'default';
+    editBar.classList.add('hidden');
+    toggleBtn.innerHTML = '&#9998; Edit Slide';
+    toggleBtn.classList.replace('bg-amber-600', 'bg-gray-700');
+
+    scaleSlidePreviews();
+}
+
+async function saveSlideEdit(slideId) {
+    const preview = document.getElementById(`live-preview-${slideId}`);
+    const editBar = document.getElementById(`edit-bar-${slideId}`);
+    const toggleBtn = document.getElementById(`edit-toggle-${slideId}`);
+    if (!preview) return;
+
+    // Remove contenteditable and outlines before saving
+    preview.querySelectorAll('[contenteditable]').forEach(el => {
+        el.contentEditable = 'false';
+        el.style.outline = 'none';
+        el.style.outlineOffset = '';
+        el.style.borderRadius = '';
+    });
+
+    // Get the modified HTML
+    const newHtml = preview.innerHTML;
+
+    // Disable editing UI
+    preview.style.pointerEvents = 'none';
+    preview.style.cursor = 'default';
+    editBar.classList.add('hidden');
+    toggleBtn.innerHTML = '&#9998; Edit Slide';
+    toggleBtn.classList.replace('bg-amber-600', 'bg-gray-700');
+
+    // Save to server
+    const result = await api(`/api/slides/${slideId}/update`, {
+        html_content: newHtml,
+        image_url: '', // Clear rendered image since design changed
+    });
+
+    if (result.success) {
+        delete editBackups[slideId];
+        toast('Slide design saved!', 'success');
+    } else {
+        toast(result.error || 'Failed to save', 'error');
+        // Restore backup on failure
+        if (editBackups[slideId]) {
+            preview.innerHTML = editBackups[slideId];
+            delete editBackups[slideId];
+        }
+    }
+
+    scaleSlidePreviews();
+}
 
 // ── Gamma-style: Regenerate individual slide design ──
 

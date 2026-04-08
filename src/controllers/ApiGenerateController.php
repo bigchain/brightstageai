@@ -111,22 +111,25 @@ class ApiGenerateController
 
         $image_data = $input['image_data'];
 
-        // Validate it's a PNG data URL
-        if (!preg_match('/^data:image\/png;base64,/', $image_data)) {
-            json_error('Invalid image format. Must be base64 PNG.');
+        // Validate image data URL (PNG, JPG, or WebP)
+        if (!preg_match('/^data:image\/(png|jpeg|webp);base64,/', $image_data, $format_match)) {
+            json_error('Invalid image format. Must be base64 PNG, JPG, or WebP.');
         }
 
+        $ext_map = ['png' => 'png', 'jpeg' => 'jpg', 'webp' => 'webp'];
+        $ext = $ext_map[$format_match[1]] ?? 'png';
+
         // Decode
-        $base64 = preg_replace('/^data:image\/png;base64,/', '', $image_data);
+        $base64 = preg_replace('/^data:image\/[a-z]+;base64,/', '', $image_data);
         $binary = base64_decode($base64, true);
 
         if ($binary === false || strlen($binary) < 100) {
             json_error('Invalid image data');
         }
 
-        // Max 5MB per slide image
-        if (strlen($binary) > 5 * 1024 * 1024) {
-            json_error('Image too large (max 5MB)');
+        // Max 10MB per slide image
+        if (strlen($binary) > 10 * 1024 * 1024) {
+            json_error('Image too large (max 10MB)');
         }
 
         // Save to storage
@@ -136,7 +139,7 @@ class ApiGenerateController
             mkdir($slides_dir, 0755, true);
         }
 
-        $filename = "slide_{$slide['slide_order']}.png";
+        $filename = "slide_{$slide['slide_order']}.{$ext}";
         $filepath = $slides_dir . '/' . $filename;
         file_put_contents($filepath, $binary);
 
