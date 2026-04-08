@@ -2,13 +2,8 @@
 /**
  * Text-to-Speech service via OpenRouter.
  *
- * VERIFIED: Uses openai/gpt-audio-mini model through OpenRouter chat completions.
- * Audio output requires modalities: ["text", "audio"] and audio config.
- * Streaming may be required — we try non-streaming first, fall back to streaming.
- *
- * Model: openai/gpt-audio-mini ($0.60/M input, $2.40/M audio output tokens)
- * Voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
- * Formats: mp3, wav, flac, opus, aac
+ * VERIFIED: openai/gpt-audio-mini requires stream: true for audio output.
+ * Response comes as SSE chunks with delta.audio.data containing base64 fragments.
  */
 
 class TTSService
@@ -20,8 +15,8 @@ class TTSService
     public function __construct()
     {
         $this->api_key = env('OPENROUTER_API_KEY', '');
-        $this->base_url = OPENROUTER_BASE_URL; // https://openrouter.ai/api/v1
-        $this->model = 'openai/gpt-audio-mini'; // Verified: exists on OpenRouter, supports audio output
+        $this->base_url = OPENROUTER_BASE_URL;
+        $this->model = 'openai/gpt-audio-mini';
     }
 
     public function is_available(): bool
@@ -29,34 +24,21 @@ class TTSService
         return $this->api_key !== '';
     }
 
-    /**
-     * Generate TTS audio for a text string.
-     * Returns MP3 binary data, or null on failure.
-     */
     public function generate(string $text, string $voice = 'alloy'): ?string
     {
-        if (!$this->is_available()) {
-            error_log('BrightStage TTS: OPENROUTER_API_KEY not configured');
-            return null;
-        }
+        if (!$this->is_available()) return null;
 
         $text = trim($text);
         if ($text === '' || mb_strlen($text) < 5) return null;
 
-        // Validate voice
         $valid_voices = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer'];
         if (!in_array($voice, $valid_voices, true)) $voice = 'alloy';
 
-        // Split long text into chunks (safety limit)
         $chunks = $this->split_text($text, 4000);
         $audio_parts = [];
 
         foreach ($chunks as $chunk) {
-            // Try non-streaming first, fall back to streaming
-            $audio = $this->call_non_streaming($chunk, $voice);
-            if ($audio === null) {
-                $audio = $this->call_streaming($chunk, $voice);
-            }
+            $audio = $this->call_streaming_api($chunk, $voice);
             if ($audio === null) return null;
             $audio_parts[] = $audio;
         }
@@ -64,9 +46,6 @@ class TTSService
         return count($audio_parts) === 1 ? $audio_parts[0] : implode('', $audio_parts);
     }
 
-    /**
-     * Generate audio for all slides in a presentation.
-     */
     public function generate_for_slides(array $slides, int $user_id, int $presentation_id, string $voice = 'alloy'): array
     {
         $results = [];
@@ -82,7 +61,7 @@ class TTSService
 
             $audio_data = $this->generate($text, $voice);
             if ($audio_data === null) {
-                $results[] = ['slide_id' => $slide['id'], 'success' => false, 'error' => 'TTS generation failed'];
+                $results[] = ['slide_id' => $slide['id'], 'success' => false, 'error' => 'TTS failed'];
                 continue;
             }
 
@@ -101,144 +80,89 @@ class TTSService
     }
 
     /**
-     * Non-streaming approach.
-     * Response: choices[0].message.audio.data = base64 audio
+     * Streaming API call — the ONLY way audio works on OpenRouter.
+     * Collects SSE chunks, extracts base64 audio fragments, decodes.
      */
-    private function call_non_streaming(string $text, string $voice): ?string
+    private function call_streaming_api(string $text, string $voice): ?string
     {
-        $payload = [
+        $payload = json_encode([
             'model'      => $this->model,
+            'stream'     => true,
             'modalities' => ['text', 'audio'],
             'audio'      => ['voice' => $voice, 'format' => 'mp3'],
             'messages'   => [
-                ['role' => 'system', 'content' => 'Read the following text aloud exactly as written. Natural pace, clear pronunciation. No commentary.'],
+                ['role' => 'system', 'content' => 'Read the following text aloud exactly as written. Natural pace, clear pronunciation. No extra words or commentary.'],
                 ['role' => 'user', 'content' => $text],
             ],
-        ];
-
-        $ch = curl_init($this->base_url . '/chat/completions');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $this->api_key,
-                'HTTP-Referer: ' . APP_URL,
-                'X-Title: BrightStage Video',
-            ],
-            CURLOPT_TIMEOUT        => 120,
-            CURLOPT_CONNECTTIMEOUT => 15,
         ]);
 
-        $body = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error || $http_code >= 400) {
-            error_log("BrightStage TTS non-streaming: HTTP {$http_code} body: " . substr($body, 0, 500));
-            return null;
-        }
-
-        $response = json_decode($body, true);
-
-        // Check for audio data in response
-        if (isset($response['choices'][0]['message']['audio']['data'])) {
-            $decoded = base64_decode($response['choices'][0]['message']['audio']['data']);
-            if ($decoded !== false && strlen($decoded) > 100) {
-                return $decoded;
-            }
-        }
-
-        error_log('BrightStage TTS non-streaming: No audio.data in response, trying streaming');
-        return null;
-    }
-
-    /**
-     * Streaming approach (OpenRouter docs say audio output may require this).
-     * SSE chunks: delta.audio.data = base64 fragments, concatenate then decode.
-     */
-    private function call_streaming(string $text, string $voice): ?string
-    {
-        $payload = [
-            'model'      => $this->model,
-            'modalities' => ['text', 'audio'],
-            'audio'      => ['voice' => $voice, 'format' => 'mp3'],
-            'stream'     => true,
-            'messages'   => [
-                ['role' => 'system', 'content' => 'Read the following text aloud exactly as written. Natural pace, clear pronunciation. No commentary.'],
-                ['role' => 'user', 'content' => $text],
-            ],
-        ];
+        // Use a temp file to collect the streaming response
+        $tmp_file = tempnam(sys_get_temp_dir(), 'tts_');
+        $fp = fopen($tmp_file, 'w');
 
         $ch = curl_init($this->base_url . '/chat/completions');
-
-        $audio_base64_chunks = [];
-
         curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => false,
             CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_FILE           => $fp,
             CURLOPT_HTTPHEADER     => [
                 'Content-Type: application/json',
                 'Authorization: Bearer ' . $this->api_key,
                 'HTTP-Referer: ' . APP_URL,
                 'X-Title: BrightStage Video',
-                'Accept: text/event-stream',
             ],
-            CURLOPT_TIMEOUT        => 120,
+            CURLOPT_TIMEOUT        => 180,
             CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$audio_base64_chunks) {
-                $lines = explode("\n", $data);
-                foreach ($lines as $line) {
-                    $line = trim($line);
-                    if ($line === '' || $line === 'data: [DONE]') continue;
-                    if (!str_starts_with($line, 'data: ')) continue;
-
-                    $json_str = substr($line, 6);
-                    $chunk = json_decode($json_str, true);
-
-                    if (isset($chunk['choices'][0]['delta']['audio']['data'])) {
-                        $audio_base64_chunks[] = $chunk['choices'][0]['delta']['audio']['data'];
-                    }
-                }
-                return strlen($data);
-            },
         ]);
 
         curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
+        fclose($fp);
 
-        // For streaming, we need to capture the body differently since WRITEFUNCTION was used
-        $stream_body = '';
-        if ($error || $http_code >= 400) {
-            error_log("BrightStage TTS streaming: HTTP {$http_code}");
+        // Read the collected response
+        $raw = file_get_contents($tmp_file);
+        unlink($tmp_file);
+
+        if ($error) {
+            error_log("BrightStage TTS: curl error: {$error}");
             return null;
         }
 
-        if (empty($audio_base64_chunks)) {
-            error_log('BrightStage TTS streaming: No audio chunks received');
+        if ($http_code >= 400) {
+            error_log("BrightStage TTS: HTTP {$http_code} body: " . substr($raw, 0, 300));
             return null;
         }
 
-        // Concatenate base64 chunks and decode
-        $full_base64 = implode('', $audio_base64_chunks);
-        $decoded = base64_decode($full_base64);
+        // Parse SSE lines and extract audio base64 chunks
+        $audio_b64 = '';
+        $lines = explode("\n", $raw);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line === 'data: [DONE]') continue;
+            if (!str_starts_with($line, 'data: ')) continue;
 
+            $json = json_decode(substr($line, 6), true);
+            if (isset($json['choices'][0]['delta']['audio']['data'])) {
+                $audio_b64 .= $json['choices'][0]['delta']['audio']['data'];
+            }
+        }
+
+        if ($audio_b64 === '') {
+            error_log('BrightStage TTS: No audio data in stream. Raw first 500 chars: ' . substr($raw, 0, 500));
+            return null;
+        }
+
+        $decoded = base64_decode($audio_b64);
         if ($decoded === false || strlen($decoded) < 100) {
-            error_log('BrightStage TTS streaming: Failed to decode audio (' . strlen($full_base64) . ' chars base64)');
+            error_log('BrightStage TTS: base64 decode failed. Length: ' . strlen($audio_b64));
             return null;
         }
 
         return $decoded;
     }
 
-    /**
-     * Split text at sentence boundaries.
-     */
     private function split_text(string $text, int $max_chars): array
     {
         if (mb_strlen($text) <= $max_chars) return [$text];

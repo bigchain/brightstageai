@@ -54,6 +54,27 @@ if (str_starts_with($uri, '/api/')) {
         (new ApiSlideController())->delete((int)$m[1]);
     }
 
+    // Voice preview — generates a short sample (free, no credits)
+    if ($uri === '/api/preview-voice' && $method === 'POST') {
+        if (!is_logged_in()) json_error('Unauthorized', 401);
+        if (!verify_csrf()) json_error('Invalid CSRF token', 403);
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $voice = trim($input['voice'] ?? 'alloy');
+        $valid = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer'];
+        if (!in_array($voice, $valid, true)) $voice = 'alloy';
+
+        require_once APP_ROOT . '/src/services/TTSService.php';
+        $tts = new TTSService();
+        $audio = $tts->generate('Hello, this is a preview of the ' . $voice . ' voice. How does this sound for your presentation?', $voice);
+
+        if ($audio === null) json_error('Voice preview failed. TTS service may be unavailable.');
+
+        // Return as base64 data URL
+        $b64 = base64_encode($audio);
+        json_success(['audio_data' => "data:audio/mp3;base64,{$b64}"]);
+    }
+
     // AI Image Generation
     if ($uri === '/api/generate/image' && $method === 'POST') {
         if (!is_logged_in()) json_error('Unauthorized', 401);

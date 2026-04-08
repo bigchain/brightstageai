@@ -304,18 +304,22 @@
                 </button>
                 <?php endif; ?>
 
-                <!-- Step 3: Audio with voice selector -->
+                <!-- Step 3: Audio with voice selector + preview -->
                 <?php if ($has_images): ?>
                 <div class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_audio ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50 ring-2 ring-amber-200' ?> text-center">
                     <span class="text-2xl mb-1"><?= $has_audio ? '&#10003;' : '&#127908;' ?></span>
-                    <select id="voice-selector" class="text-xs border border-gray-300 rounded px-1.5 py-1 mb-2 bg-white">
-                        <option value="alloy">Alloy (neutral)</option>
-                        <option value="nova">Nova (female)</option>
-                        <option value="echo">Echo (male)</option>
-                        <option value="shimmer">Shimmer (soft)</option>
-                        <option value="onyx">Onyx (deep)</option>
-                        <option value="fable">Fable (warm)</option>
-                    </select>
+                    <div class="flex items-center space-x-1 mb-2">
+                        <select id="voice-selector" onchange="previewVoice(this.value)" class="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white">
+                            <option value="alloy">Alloy (neutral)</option>
+                            <option value="nova">Nova (female)</option>
+                            <option value="echo">Echo (male)</option>
+                            <option value="shimmer">Shimmer (soft)</option>
+                            <option value="onyx">Onyx (deep)</option>
+                            <option value="fable">Fable (warm)</option>
+                        </select>
+                        <button onclick="previewVoice(document.getElementById('voice-selector').value)" title="Preview voice"
+                            class="w-6 h-6 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center text-xs hover:bg-amber-300 transition">&#9654;</button>
+                    </div>
                     <button onclick="generateAudio()" id="btn-generate-audio"
                         class="text-xs font-semibold <?= $has_audio ? 'text-green-700' : 'text-amber-700' ?> hover:underline disabled:opacity-50">
                         <?= $has_audio ? 'Regenerate Audio' : 'Generate Audio' ?>
@@ -1266,6 +1270,26 @@ async function submitDesignPrompt(slideId, btn) {
 }
 
 // ── Phase 3: Audio Generation ──
+
+// ── Voice Preview ──
+
+let previewAudioEl = null;
+async function previewVoice(voice) {
+    // Stop any current preview
+    if (previewAudioEl) { previewAudioEl.pause(); previewAudioEl = null; }
+
+    toast('Generating voice preview...', 'info', 3000);
+
+    const result = await api('/api/preview-voice', { voice });
+
+    if (result.success && result.data.audio_data) {
+        previewAudioEl = new Audio(result.data.audio_data);
+        previewAudioEl.play();
+        previewAudioEl.onended = () => { previewAudioEl = null; };
+    } else {
+        toast(result.error || 'Voice preview failed', 'error');
+    }
+}
 
 // ── Audio Playback ──
 
