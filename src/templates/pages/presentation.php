@@ -83,15 +83,15 @@
             <!-- Live Slide Preview (Gamma-style) -->
             <?php if (!empty($slide['html_content'])): ?>
             <div class="border-b border-gray-200 relative group">
-                <!-- Live HTML render in scaled iframe -->
-                <div class="bg-gray-900 flex justify-center p-3 overflow-hidden" style="max-height: 320px;">
+                <!-- Wrapper: 16:9 ratio, scales 1920x1080 to fit -->
+                <div class="slide-preview-wrapper bg-gray-900 rounded-t-xl overflow-hidden" style="position:relative;width:100%;padding-bottom:56.25%;">
                     <div class="slide-live-preview" id="live-preview-<?= $slide['id'] ?>"
-                        style="width:1920px;height:1080px;transform:scale(0.28);transform-origin:top center;pointer-events:none;">
+                        style="position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left;pointer-events:none;">
                         <?= $slide['html_content'] ?>
                     </div>
                 </div>
                 <!-- Overlay actions -->
-                <div class="absolute bottom-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition">
+                <div class="absolute bottom-3 right-3 flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     <button onclick="regenerateSlideDesign(<?= $slide['id'] ?>)"
                         class="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 shadow-lg transition">
                         &#10024; Regenerate Design
@@ -101,7 +101,7 @@
                         &#9998; Edit with AI
                     </button>
                 </div>
-                <!-- Hidden img for rendered PNG (used by slideshow/PDF) -->
+                <!-- Hidden img for rendered PNG -->
                 <img id="slide-preview-<?= $slide['id'] ?>" class="hidden"
                     src="<?= !empty($slide['image_url']) ? e($slide['image_url']) : '' ?>">
             </div>
@@ -542,6 +542,19 @@ window.addEventListener('beforeunload', (e) => {
 
 // ── Project Management ──
 
+// ── Scale live slide previews to fit their container ──
+
+function scaleSlidePreviews() {
+    document.querySelectorAll('.slide-preview-wrapper').forEach(wrapper => {
+        const preview = wrapper.querySelector('.slide-live-preview');
+        if (!preview) return;
+        const scale = wrapper.offsetWidth / 1920;
+        preview.style.transform = `scale(${scale})`;
+    });
+}
+scaleSlidePreviews();
+window.addEventListener('resize', scaleSlidePreviews);
+
 // ── Template Switcher ──
 
 async function switchTemplate(templateId) {
@@ -672,7 +685,7 @@ async function regenerateSlideDesign(slideId) {
     if (result.success) {
         // Update live preview
         const preview = document.getElementById(`live-preview-${slideId}`);
-        if (preview) preview.innerHTML = result.data.html;
+        if (preview) { preview.innerHTML = result.data.html; scaleSlidePreviews(); }
 
         // Update credits
         const me = await api('/api/auth/me', null, 'GET');
@@ -724,7 +737,7 @@ async function submitDesignPrompt(slideId, btn) {
 
     if (result.success) {
         const preview = document.getElementById(`live-preview-${slideId}`);
-        if (preview) preview.innerHTML = result.data.html;
+        if (preview) { preview.innerHTML = result.data.html; scaleSlidePreviews(); }
 
         const me = await api('/api/auth/me', null, 'GET');
         if (me.success) updateCreditsDisplay(me.data.credits_balance);
