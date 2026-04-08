@@ -84,7 +84,7 @@
             <?php if (!empty($slide['html_content'])): ?>
             <div class="border-b border-gray-200 relative group">
                 <!-- Wrapper: 16:9 ratio, scales 1920x1080 to fit -->
-                <div class="slide-preview-wrapper bg-gray-900 rounded-t-xl overflow-hidden" style="position:relative;width:100%;padding-bottom:56.25%;">
+                <div class="slide-preview-wrapper bg-gray-900 rounded-t-xl overflow-hidden cursor-pointer" onclick="openSlideshow(<?= $slide['slide_order'] - 1 ?>)" style="position:relative;width:100%;padding-bottom:56.25%;" title="Click to preview slideshow">
                     <div class="slide-live-preview" id="live-preview-<?= $slide['id'] ?>"
                         style="position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left;pointer-events:none;">
                         <?= $slide['html_content'] ?>
@@ -282,83 +282,70 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-<?= $has_html ? ($has_images ? '4' : '3') : '2' ?> gap-3">
+            <div class="grid grid-cols-4 <?= $has_video ? 'sm:grid-cols-5' : '' ?> gap-3">
 
                 <!-- Step 1: Design -->
                 <button onclick="generateSlideDesigns()" id="btn-generate-slides"
                     class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_html ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50 ring-2 ring-purple-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
-                    <span class="text-2xl mb-2" id="icon-design"><?= $has_html ? '&#10003;' : '&#10024;' ?></span>
-                    <span class="text-xs font-semibold <?= $has_html ? 'text-green-700' : 'text-purple-700' ?>" id="label-design">
-                        <?= $has_html ? 'Redesign Slides' : 'Design Slides' ?>
+                    <span class="text-2xl mb-2"><?= $has_html ? '&#10003;' : '&#10024;' ?></span>
+                    <span class="text-xs font-semibold <?= $has_html ? 'text-green-700' : 'text-purple-700' ?>">
+                        <?= $has_html ? 'Redesign' : 'Design Slides' ?>
                     </span>
-                    <span class="text-xs text-gray-400 mt-1"><?= count($slides) * CREDIT_COSTS['generate_slide'] ?> credits</span>
+                    <span class="text-xs text-gray-400 mt-1"><?= count($slides) * CREDIT_COSTS['generate_slide'] ?> cr</span>
                 </button>
 
                 <!-- Step 2: Render -->
-                <?php if ($has_html): ?>
-                <button onclick="renderAllSlides()" id="btn-render-slides"
-                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_images ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50 ring-2 ring-blue-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
+                <button onclick="renderAllSlides()" id="btn-render-slides" <?= !$has_html ? 'disabled' : '' ?>
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_images ? 'border-green-200 bg-green-50' : ($has_html ? 'border-blue-200 bg-blue-50' : 'border-dashed border-gray-200 opacity-40') ?> transition hover:shadow-sm text-center disabled:opacity-40">
                     <span class="text-2xl mb-2"><?= $has_images ? '&#10003;' : '&#127912;' ?></span>
-                    <span class="text-xs font-semibold <?= $has_images ? 'text-green-700' : 'text-blue-700' ?>">Render Previews</span>
-                    <span class="text-xs text-gray-400 mt-1">Free</span>
+                    <span class="text-xs font-semibold <?= $has_images ? 'text-green-700' : ($has_html ? 'text-blue-700' : 'text-gray-400') ?>">Render</span>
+                    <span class="text-xs text-gray-400 mt-1"><?= !$has_html ? 'Design first' : 'Free' ?></span>
                 </button>
-                <?php endif; ?>
 
-                <!-- Step 3: Audio with voice selector + preview -->
-                <?php if ($has_images): ?>
-                <div class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_audio ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50 ring-2 ring-amber-200' ?> text-center">
+                <!-- Step 3: Audio + voice selector -->
+                <div class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_audio ? 'border-green-200 bg-green-50' : ($has_html ? 'border-amber-200 bg-amber-50' : 'border-dashed border-gray-200 opacity-40') ?> text-center">
                     <span class="text-2xl mb-1"><?= $has_audio ? '&#10003;' : '&#127908;' ?></span>
-                    <div class="flex items-center space-x-1 mb-2">
-                        <select id="voice-selector" onchange="previewVoice(this.value)" class="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white">
-                            <option value="alloy">Alloy (neutral)</option>
-                            <option value="nova">Nova (female)</option>
-                            <option value="echo">Echo (male)</option>
-                            <option value="shimmer">Shimmer (soft)</option>
-                            <option value="onyx">Onyx (deep)</option>
-                            <option value="fable">Fable (warm)</option>
+                    <?php if ($has_html): ?>
+                    <div class="flex items-center space-x-1 mb-1">
+                        <select id="voice-selector" class="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white">
+                            <option value="alloy">Alloy</option>
+                            <option value="nova">Nova</option>
+                            <option value="echo">Echo</option>
+                            <option value="shimmer">Shimmer</option>
+                            <option value="onyx">Onyx</option>
+                            <option value="fable">Fable</option>
                         </select>
-                        <button onclick="previewVoice(document.getElementById('voice-selector').value)" title="Preview voice"
-                            class="w-6 h-6 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center text-xs hover:bg-amber-300 transition">&#9654;</button>
+                        <button onclick="previewVoice(document.getElementById('voice-selector').value)" title="Preview"
+                            class="w-5 h-5 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center text-xs hover:bg-amber-300 transition">&#9654;</button>
                     </div>
                     <button onclick="generateAudio()" id="btn-generate-audio"
-                        class="text-xs font-semibold <?= $has_audio ? 'text-green-700' : 'text-amber-700' ?> hover:underline disabled:opacity-50">
-                        <?= $has_audio ? 'Regenerate Audio' : 'Generate Audio' ?>
+                        class="text-xs font-semibold <?= $has_audio ? 'text-green-700' : 'text-amber-700' ?> hover:underline">
+                        <?= $has_audio ? 'Redo Audio' : 'Audio' ?>
                     </button>
-                    <span class="text-xs text-gray-400 mt-0.5"><?= count($slides) * CREDIT_COSTS['generate_audio'] ?> credits</span>
+                    <span class="text-xs text-gray-400 mt-0.5"><?= count($slides) * CREDIT_COSTS['generate_audio'] ?> cr</span>
+                    <?php else: ?>
+                    <span class="text-xs font-semibold text-gray-400">Audio</span>
+                    <span class="text-xs text-gray-300 mt-1">Design first</span>
+                    <?php endif; ?>
                 </div>
-                <?php else: ?>
-                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
-                    <span class="text-2xl mb-2">&#127908;</span>
-                    <span class="text-xs font-semibold text-gray-400">Generate Audio</span>
-                    <span class="text-xs text-gray-300 mt-1">Render slides first</span>
-                </div>
-                <?php endif; ?>
 
-                <!-- Step 4: Video -->
-                <?php if ($has_audio): ?>
-                <button onclick="generateVideo()" id="btn-generate-video"
-                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_video ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50 ring-2 ring-red-200' ?> transition hover:shadow-sm text-center disabled:opacity-50">
+                <!-- Step 4: Video — ALWAYS visible -->
+                <button onclick="generateVideo()" id="btn-generate-video" <?= !$has_audio ? 'disabled' : '' ?>
+                    class="flex flex-col items-center p-4 rounded-xl border-2 <?= $has_video ? 'border-green-200 bg-green-50' : ($has_audio ? 'border-red-200 bg-red-50 ring-2 ring-red-200' : 'border-dashed border-gray-200 opacity-40') ?> transition hover:shadow-sm text-center disabled:opacity-40">
                     <span class="text-2xl mb-2"><?= $has_video ? '&#10003;' : '&#127916;' ?></span>
-                    <span class="text-xs font-semibold <?= $has_video ? 'text-green-700' : 'text-red-700' ?>">
-                        <?= $has_video ? 'Regenerate Video' : 'Generate Video' ?>
+                    <span class="text-xs font-semibold <?= $has_video ? 'text-green-700' : ($has_audio ? 'text-red-700' : 'text-gray-400') ?>">
+                        <?= $has_video ? 'Redo Video' : 'Video' ?>
                     </span>
-                    <span class="text-xs text-gray-400 mt-1"><?= CREDIT_COSTS['assemble_video'] ?> credits</span>
+                    <span class="text-xs text-gray-400 mt-1"><?= !$has_audio ? 'Audio first' : CREDIT_COSTS['assemble_video'] . ' cr' ?></span>
                 </button>
-                <?php elseif ($has_images): ?>
-                <div class="flex flex-col items-center p-4 rounded-xl border-2 border-dashed border-gray-200 text-center opacity-40">
-                    <span class="text-2xl mb-2">&#127916;</span>
-                    <span class="text-xs font-semibold text-gray-400">Generate Video</span>
-                    <span class="text-xs text-gray-300 mt-1">Generate audio first</span>
-                </div>
-                <?php endif; ?>
 
-                <!-- Download Video (if complete) -->
+                <!-- Download (if video complete) -->
                 <?php if ($has_video): ?>
                 <a href="<?= e($video['file_url']) ?>" download
                     class="flex flex-col items-center p-4 rounded-xl border-2 border-green-300 bg-green-100 transition hover:shadow-sm text-center">
                     <span class="text-2xl mb-2">&#128229;</span>
-                    <span class="text-xs font-semibold text-green-700">Download MP4</span>
-                    <span class="text-xs text-gray-400 mt-1"><?= $video['duration_seconds'] ? $video['duration_seconds'] . 's' : '' ?></span>
+                    <span class="text-xs font-semibold text-green-700">Download</span>
+                    <span class="text-xs text-gray-400 mt-1"><?= $video['duration_seconds'] ? gmdate('i:s', $video['duration_seconds']) : 'MP4' ?></span>
                 </a>
                 <?php endif; ?>
             </div>
@@ -1429,7 +1416,7 @@ async function duplicatePresentation() {
 
 // ── Slideshow Preview ──
 
-function openSlideshow() {
+function openSlideshow(startAt = 0) {
     // Build slides from what's actually on the page (not from JS data which may be stale/truncated)
     const slidesForShow = SLIDES_DATA.map(s => {
         const livePreview = document.getElementById(`live-preview-${s.id}`);
@@ -1445,7 +1432,7 @@ function openSlideshow() {
         toast('No slides to preview. Design your slides first.', 'warning');
         return;
     }
-    Slideshow.open(slidesForShow);
+    Slideshow.open(slidesForShow, startAt);
 }
 
 // ── Upload Custom Slides ──
